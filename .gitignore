@@ -112,10 +112,24 @@ creg-cli
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+# Flattened workspace: Foundry writes to repo root as well as contracts/
+/broadcast/
+/cache/
 contracts/foundry.lock
 contracts/deployments/
 foundry.lock
 remappings.txt
+
+# =============================================================================
+# LOCAL NODE / TESTNET RUNTIME DATA (never publish)
+# =============================================================================
+/sepolia-node-data/
+testnet/ops-201-logs/
+testnet/soak-3node-logs/
+node-1-data/
+malicious-pkg/
+demo-v2/
+playground/
 
 # =============================================================================
 # ZK CIRCUIT BUILD ARTIFACTS & KEYS
