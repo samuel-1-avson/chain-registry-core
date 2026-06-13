@@ -41,22 +41,7 @@ flowchart LR
 
 ---
 
-## Public testnet
 
-| Service | URL |
-|---------|-----|
-| **API** | https://api.testnet.cregnet.dev |
-| **Chain spec** | https://spec.testnet.cregnet.dev |
-| **Explorer** | https://explorer.testnet.cregnet.dev |
-| **Faucet** | https://faucet.testnet.cregnet.dev |
-| **Join hub** | https://testnet.cregnet.dev |
-| **Waitlist** | https://waitlist.cregnet.dev |
-
-**Binaries:** [v0.1.0-testnet release](https://github.com/samuel-1-avson/chain-registry-core/releases/tag/v0.1.0-testnet) (`creg` + `creg-node` for Linux, Windows, macOS).
-
-Chain parameters: [`testnet/chain-spec.sepolia.json`](testnet/chain-spec.sepolia.json).
-
----
 
 ## On GitHub
 
@@ -69,7 +54,7 @@ This repo is organized like other public blockchains — **protocol and consensu
 | **ZK circuits** | [`circuits/`](circuits/) |
 | **Release binaries** | [Releases](https://github.com/samuel-1-avson/chain-registry-core/releases) |
 
-The alpha waitlist app is a separate product surface: live at [waitlist.cregnet.dev](https://waitlist.cregnet.dev), source in [samuel-1-avson/Creg-waitlist](https://github.com/samuel-1-avson/Creg-waitlist). Web apps (explorer, hub) and GCP deploy live in the private **chain-registry-ops** repo (maintainers only).
+
 
 ---
 
