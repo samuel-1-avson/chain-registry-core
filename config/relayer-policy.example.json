@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "mode": "testnet-only",
+  "chains": [
+    {
+      "id": 11155111,
+      "label": "Ethereum Sepolia",
+      "enabled": true,
+      "dailyWalletQuota": 10,
+      "dailyIpQuota": 40,
+      "maxGasPerRequest": 500000,
+      "allowContracts": [
+        "${VITE_SEPOLIA_CREG_TOKEN}",
+        "${VITE_SEPOLIA_STAKING_ADDR}"
+      ],
+      "allowSelectors": [
+        {
+          "key": "publisher",
+          "name": "stakeAsPublisherWithPermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+          "selector": "0xe2389e9e",
+          "maxAmountWei": "1000000000000000000000"
+        },
+        {
+          "key": "validator",
+          "name": "applyToBeValidatorWithPermit(address,uint256,uint256,uint8,bytes32,bytes32)",
+          "selector": "0x46bbf25e",
+          "maxAmountWei": "5000000000000000000000"
+        }
+      ]
+    }
+  ],
+  "signature": {
+    "scheme": "eip712",
+    "domainName": "Chain Registry Sponsored Testnet Tx",
+    "domainVersion": "1"
+  },
+  "replayProtection": {
+    "nonceScope": "wallet-and-chain",
+    "maxExpirySeconds": 300
+  },
+  "notes": [
+    "Sepolia-only relayer policy for the public Chain Registry testnet.",
+    "Keep this allowlist narrow. Do not sponsor arbitrary calldata.",
+    "Use testnet-only relayer keys that are isolated from deployer and faucet wallets."
+  ]
+}

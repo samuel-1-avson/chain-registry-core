@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chain-registry.local/schemas/scanner-profile.schema.json",
+  "title": "Chain Registry Scanner Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "scanner_version",
+    "analysis_bundles",
+    "profile_digest",
+    "signed_by"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scanner_version": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "^degraded"
+      }
+    },
+    "analysis_bundles": {
+      "$ref": "#/$defs/analysis_bundles"
+    },
+    "profile_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signed_by": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/signature"
+      }
+    }
+  },
+  "$defs": {
+    "analysis_bundles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_bundle_id",
+        "feature_schema_id",
+        "expert_bundle_id",
+        "embedding_model_id",
+        "index_epoch",
+        "threshold_profile_id",
+        "llm_prompt_profile_id",
+        "osv_snapshot_epoch"
+      ],
+      "properties": {
+        "policy_bundle_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feature_schema_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expert_bundle_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "embedding_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index_epoch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "threshold_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "llm_prompt_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "osv_snapshot_epoch": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key_id",
+        "algorithm",
+        "signature"
+      ],
+      "properties": {
+        "key_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "algorithm": {
+          "enum": [
+            "ed25519"
+          ]
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

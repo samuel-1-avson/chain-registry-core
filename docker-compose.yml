@@ -1,0 +1,343 @@
+# docker-compose.yml — Sepolia testnet stack (no local Anvil)
+#
+# Services: IPFS, chain-spec server, node, postgres, indexer, faucet, relayer,
+# web-explorer. Contracts are deployed on Sepolia; this file does not deploy L1.
+#
+# Usage:
+#   copy testnet/.env.sepolia → .env (or set SEPOLIA_RPC_URL + CREG_* in .env)
+#   docker compose up -d --no-build
+#
+# Optional profiles: cli, tui, llm (local Ollama for Lane B/C)
+# Observability overlay: docker compose -f docker-compose.yml -f observability/docker-compose.observability.yml up -d
+#
+# Local Anvil dev (legacy): docker compose -f docker-compose.anvil.yml up -d
+
+services:
+
+  # ── IPFS ──────────────────────────────────────────────────────────────────
+  ipfs:
+    image: ipfs/kubo:v0.27.0
+    container_name: creg-ipfs
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8081:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+      - ./scripts/ipfs-cors.sh:/container-init.d/ipfs-cors.sh:ro
+    command: ["daemon", "--init", "--init-profile=server", "--routing=dhtclient"]
+    environment:
+      - IPFS_PROFILE=server
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ipfs", "id"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Chain spec (signed Sepolia testnet config) ────────────────────────────
+  spec-server:
+    image: nginx:alpine
+    container_name: creg-spec-server
+    volumes:
+      - ./testnet/chain-spec.sepolia.json:/usr/share/nginx/html/chain-spec.json:ro
+      - ./testnet/chain-spec.sepolia.json.sig:/usr/share/nginx/html/chain-spec.json.sig:ro
+      - ./testnet/spec-server/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8888:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/chain-spec.json > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── CREG node (Sepolia L1 + signed chain spec) ──────────────────────────────
+  node:
+    image: chain-registry-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-node
+    environment:
+      CREG_NODE_ID: ${CREG_NODE_ID:-sepolia-docker-1}
+      CREG_IS_VALIDATOR: ${CREG_IS_VALIDATOR:-false}
+      CREG_VALIDATOR_KEY: ${CREG_VALIDATOR_KEY:-${NODE1_VALIDATOR_KEY:-}}
+
+      CREG_LISTEN: "0.0.0.0:8080"
+      CREG_DATA_DIR: "/data"
+      CREG_P2P_LISTEN: "/ip4/0.0.0.0/tcp/9000"
+      CREG_P2P_SEEDS: ${CREG_P2P_SEEDS:-}
+      CREG_BLOCK_INTERVAL: ${CREG_BLOCK_INTERVAL:-5}
+
+      # Sepolia L1 (host .env: SEPOLIA_RPC_URL or CREG_ETH_RPC)
+      CREG_ETH_RPC: ${CREG_ETH_RPC:-${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}}
+      CREG_EXPECTED_L1_CHAIN_ID: "11155111"
+      CREG_CHAIN_ID: ${CREG_CHAIN_ID:-creg-testnet-1}
+      CREG_TESTNET: "true"
+      CREG_DEV_SANDBOX: ${CREG_DEV_SANDBOX:-false}
+
+      # Signed chain spec (internal Docker DNS)
+      CREG_CHAIN_SPEC_URL: http://spec-server/chain-spec.json
+      CREG_SPEC_SIGNATURE_URL: http://spec-server/chain-spec.json.sig
+      CREG_SPEC_SIGNING_PUBKEY: ${CREG_SPEC_SIGNING_PUBKEY:-0437e4adac481519cd6ae66907294c40cfcbf0bdeadd47806f6233be4bd5f82d}
+
+      CREG_IPFS_URL: http://ipfs:5001
+
+      # Sepolia contracts (defaults from testnet/chain-spec.sepolia.json; override in .env)
+      CREG_REGISTRY_ADDR: ${CREG_REGISTRY_ADDR:-0x3aCfF05d00AC199412a94326eD8aA874aaA3596c}
+      CREG_STAKING_ADDR: ${CREG_STAKING_ADDR:-0xf28C63C4Aafd27025E535Ab9ab7B4daC18C96Bc2}
+      CREG_GOVERNANCE_ADDR: ${CREG_GOVERNANCE_ADDR:-0x9a14F359E2bdBb43F1526743C4A91955F29Ba59A}
+      CREG_TOKEN_ADDR: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+      CREG_ZK_VERIFIER_ADDR: ${CREG_ZK_VERIFIER_ADDR:-0x0922AE98AF1D809360BDd5D5AAd84f0D823A5cF3}
+      CREG_ZK_ENABLED: "true"
+      CREG_ZK_CIRCUITS_PATH: "/app/circuits"
+      CREG_ML_ENABLED: "true"
+      CREG_ML_MODEL_PATH: "/app/models"
+      CREG_WASM_ENABLED: "true"
+      CREG_WASM_VALIDATORS_PATH: "/app/validators"
+
+      CREG_SANDBOX_NSJAIL_CONFIG: "/app/config/sandbox/nsjail-seccomp.cfg"
+      CREG_SANDBOX_DOCKER_SECCOMP: "/app/config/sandbox/docker-seccomp.json"
+      CREG_SANDBOX_ROOTFS_DIR: "/app/config/sandbox/rootfs"
+      CREG_SANDBOX_TIMEOUT: "120"
+      CREG_SANDBOX_MEMORY_MB: "512"
+
+      # Unlocks /v1/runtime/config, /v1/nodes, /v1/pending, etc. for the explorer.
+      CREG_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CREG_LLM_ENABLED: ${CREG_LLM_ENABLED:-false}
+      CREG_LLM_PROVIDERS: ${CREG_LLM_PROVIDERS:-ollama,openrouter}
+      CREG_LLM_MODEL: ${CREG_LLM_MODEL:-llama3.2}
+      CREG_OLLAMA_URL: ${CREG_OLLAMA_URL:-http://ollama:11434}
+      CREG_INTELLIGENCE_ENABLED: ${CREG_INTELLIGENCE_ENABLED:-false}
+      CREG_INTELLIGENCE_AUTO: ${CREG_INTELLIGENCE_AUTO:-true}
+      RUST_LOG: ${RUST_LOG:-info,chain_registry_node=debug}
+
+    ports:
+      - "${CREG_API_PORT:-8090}:8080"
+      - "50051:50051"
+      - "${CREG_P2P_PORT:-9011}:9000"
+    volumes:
+      - node-data:/data
+      - ./circuits:/app/circuits:ro
+      - ./validators:/app/validators:ro
+      - ./config/sandbox:/app/config/sandbox:ro
+    depends_on:
+      ipfs:
+        condition: service_healthy
+      spec-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+
+  cli:
+    image: chain-registry-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-cli
+    entrypoint: ["/app/creg"]
+    command: ["--help"]
+    environment:
+      CREG_NODE_URL: "http://node:8080"
+      CREG_ETH_RPC: ${CREG_ETH_RPC:-${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}}
+    depends_on:
+      - node
+    profiles:
+      - cli
+
+  tui-explorer:
+    image: chain-registry-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-tui-explorer
+    entrypoint: ["/app/creg"]
+    command: ["console"]
+    environment:
+      CREG_NODE_URL: "http://node:8080"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - node
+    profiles:
+      - tui
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: creg-postgres
+    environment:
+      POSTGRES_USER: creg
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-creg_password}
+      POSTGRES_DB: creg
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./testnet/init-testnet-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U creg -d creg"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  relayer:
+    image: chain-registry-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-relayer
+    entrypoint: ["/app/creg-relayer"]
+    environment:
+      CREG_SECRETS_BACKEND: env
+      RELAYER_PORT: "${RELAYER_PORT:-8083}"
+      RELAYER_RPC_URL: ${RELAYER_RPC_URL:-${SEPOLIA_RPC_URL:-${CREG_ETH_RPC:-https://ethereum-sepolia-rpc.publicnode.com}}}
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY:-}
+      RELAYER_POLICY_PATH: "/app/config/relayer-policy.example.json"
+      TESTNET_TOKEN_ADDR: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+      TESTNET_STAKING_ADDR: ${CREG_STAKING_ADDR:-0xf28C63C4Aafd27025E535Ab9ab7B4daC18C96Bc2}
+      VITE_SEPOLIA_CREG_TOKEN: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+      VITE_SEPOLIA_STAKING_ADDR: ${CREG_STAKING_ADDR:-0xf28C63C4Aafd27025E535Ab9ab7B4daC18C96Bc2}
+      RUST_LOG: "info"
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      spec-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  faucet:
+    image: chain-registry-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-faucet
+    entrypoint: ["/app/faucet"]
+    environment:
+      CREG_SECRETS_BACKEND: env
+      FAUCET_PORT: "8082"
+      FAUCET_RPC_URL: ${SEPOLIA_RPC_URL:-${CREG_ETH_RPC:-https://ethereum-sepolia-rpc.publicnode.com}}
+      # Browser-facing RPC for MetaMask / wallet setup — must not expose private RPC keys.
+      FAUCET_PUBLIC_RPC_URL: ${FAUCET_PUBLIC_RPC_URL:-http://localhost:3007/rpc}
+      FAUCET_PRIVATE_KEY: ${FAUCET_PRIVATE_KEY:-}
+      FAUCET_ADDRESS: ${FAUCET_ADDRESS:?FAUCET_ADDRESS must be set in .env}
+      FAUCET_TOKEN_CONTRACT: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+      FAUCET_CHAIN_ID: "11155111"
+      FAUCET_DRIP_AMOUNT: "1000000000000000000000"
+      # Set to 0 until the faucet wallet holds enough Sepolia ETH for gas drips (default 0.1 ETH).
+      FAUCET_NATIVE_DRIP_AMOUNT: "${FAUCET_NATIVE_DRIP_AMOUNT:-0}"
+      FAUCET_COOLDOWN_SECS: "60"
+      FAUCET_POW_DISABLED: "true"
+      FAUCET_ADMIN_TOKEN: ${FAUCET_ADMIN_TOKEN:-dev-admin-secret}
+      FAUCET_PG_URL: postgres://creg:${POSTGRES_PASSWORD:-creg_password}@postgres:5432/creg
+      FAUCET_EXPLORER_URL: http://localhost:3007
+      RUST_LOG: "info"
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      node:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  indexer:
+    image: chain-registry-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-indexer
+    entrypoint: ["/app/creg-indexer"]
+    environment:
+      CREG_PG_URL: postgres://creg:${POSTGRES_PASSWORD:-creg_password}@postgres:5432/creg
+      CREG_INDEXER_DATA_DIR: "/data"
+      CREG_INDEXER_LISTEN: "0.0.0.0:8084"
+      CREG_INDEXER_POLL_INTERVAL_SECS: "${CREG_INDEXER_POLL_INTERVAL_SECS:-5}"
+      RUST_LOG: "${INDEXER_RUST_LOG:-info,db_sync=debug}"
+    ports:
+      - "8084:8084"
+    volumes:
+      - node-data:/data:ro
+    depends_on:
+      node:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web-explorer:
+    image: chain-registry-web-explorer:latest
+    build:
+      context: ./explorer
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ""
+        VITE_NETWORK: testnet
+        VITE_NODE_ROUTE_MODE: auto
+        VITE_SEPOLIA_CREG_TOKEN: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+        VITE_SEPOLIA_STAKING_ADDR: ${CREG_STAKING_ADDR:-0xf28C63C4Aafd27025E535Ab9ab7B4daC18C96Bc2}
+        VITE_SEPOLIA_REGISTRY_ADDR: ${CREG_REGISTRY_ADDR:-0x3aCfF05d00AC199412a94326eD8aA874aaA3596c}
+        VITE_DEFAULT_NETWORK_PROFILE: sepolia
+        VITE_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+    container_name: creg-web-explorer
+    ports:
+      - "3007:80"
+    volumes:
+      - ./config/docker/explorer-nginx.sepolia.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      node:
+        condition: service_healthy
+      relayer:
+        condition: service_started
+      faucet:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Ollama (optional — docker compose --profile llm up -d) ────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: creg-ollama
+    profiles: ["llm"]
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ipfs-data:
+  node-data:
+  postgres-data:
+  ollama-data:

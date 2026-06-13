@@ -1,0 +1,28 @@
+# Chain Spec Server
+# Serves the signed chain-spec.json over HTTPS for node bootstrapping.
+#
+# Usage:
+#   1. Copy chain-spec.sepolia.json + chain-spec.sepolia.json.sig to this directory
+#   2. docker compose up -d
+#   3. Test: curl http://localhost:8888/chain-spec.json
+#
+# For production, place behind Cloudflare or AWS CloudFront for caching + DDoS.
+
+version: "3.8"
+
+services:
+  spec-server:
+    image: nginx:alpine
+    container_name: creg-spec-server
+    volumes:
+      - ./chain-spec.sepolia.json:/usr/share/nginx/html/chain-spec.json:ro
+      - ./chain-spec.sepolia.json.sig:/usr/share/nginx/html/chain-spec.json.sig:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8888:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/chain-spec.json > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

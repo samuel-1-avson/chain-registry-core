@@ -1,0 +1,120 @@
+# docker-compose.validator.yml
+# Runs exactly one Chain Registry validator on a single computer.
+#
+# Use this file on every validator host when the shared testnet services
+# (Anvil/IPFS/Postgres/Faucet/Explorer) are running elsewhere.
+#
+# Usage:
+#   docker compose --env-file validator.env -f docker-compose.validator.yml up -d --build
+#
+# Required env vars:
+#   CREG_VALIDATOR_KEY
+#   CREG_ETH_RPC
+#   CREG_IPFS_URL
+#   TESTNET_TOKEN_ADDR
+#   TESTNET_STAKING_ADDR
+#   TESTNET_REGISTRY_ADDR
+
+x-app-image: &app-image
+  image: chain-registry-app:latest
+
+x-validator-env: &validator-env
+  CREG_TESTNET: "true"
+  CREG_NODE_ID: "${CREG_NODE_ID:-node-1}"
+  CREG_DATA_DIR: "/data"
+  CREG_IS_VALIDATOR: "${CREG_IS_VALIDATOR:-true}"
+  CREG_VALIDATOR_KEY: "${CREG_VALIDATOR_KEY:?set CREG_VALIDATOR_KEY in your env file}"
+  CREG_LISTEN: "0.0.0.0:8080"
+  CREG_P2P_LISTEN: "/ip4/0.0.0.0/tcp/9000"
+  CREG_P2P_SEEDS: "${CREG_P2P_SEEDS:-}"
+  CREG_BLOCK_INTERVAL: "${CREG_BLOCK_INTERVAL:-2}"
+  CREG_SINGLE_VALIDATOR_MODE: "${CREG_SINGLE_VALIDATOR_MODE:-false}"
+  CREG_DEV_SANDBOX: "${CREG_DEV_SANDBOX:-false}"
+  CREG_ETH_RPC: "${CREG_ETH_RPC:?set CREG_ETH_RPC to the shared Anvil RPC URL}"
+  CREG_IPFS_URL: "${CREG_IPFS_URL:?set CREG_IPFS_URL to the shared IPFS API URL}"
+  CREG_PG_URL: "${CREG_PG_URL:-}"
+  CREG_VALIDATOR_SET: "${VALIDATOR_SET_JSON:-}"
+  CREG_TOKEN_ADDR: "${TESTNET_TOKEN_ADDR:?set TESTNET_TOKEN_ADDR from the bootstrap host .env.testnet}"
+  CREG_STAKING_ADDR: "${TESTNET_STAKING_ADDR:?set TESTNET_STAKING_ADDR from the bootstrap host .env.testnet}"
+  CREG_REGISTRY_ADDR: "${TESTNET_REGISTRY_ADDR:?set TESTNET_REGISTRY_ADDR from the bootstrap host .env.testnet}"
+  CREG_ZK_ENABLED: "${CREG_ZK_ENABLED:-true}"
+  CREG_ML_ENABLED: "${CREG_ML_ENABLED:-true}"
+  CREG_ML_MODEL_PATH: "/app/models"
+  CREG_WASM_ENABLED: "${CREG_WASM_ENABLED:-true}"
+  CREG_WASM_VALIDATORS_PATH: "/app/validators"
+  CREG_TLS_CERT: "${CREG_TLS_CERT:-/app/certs/server.crt}"
+  CREG_TLS_KEY: "${CREG_TLS_KEY:-/app/certs/server.key}"
+  CREG_SANDBOX_NSJAIL_CONFIG: "/app/config/sandbox/nsjail-seccomp.cfg"
+  CREG_SANDBOX_DOCKER_SECCOMP: "/app/config/sandbox/docker-seccomp.json"
+  CREG_SANDBOX_ROOTFS_DIR: "/app/config/sandbox/rootfs"
+  CREG_SANDBOX_TIMEOUT: "${CREG_SANDBOX_TIMEOUT:-120}"
+  CREG_SANDBOX_MEMORY_MB: "${CREG_SANDBOX_MEMORY_MB:-512}"
+  RUST_LOG: "${RUST_LOG:-info,chain_registry_node=debug,consensus=debug}"
+
+services:
+  app-image:
+    <<: *app-image
+    build:
+      context: .
+      dockerfile: ${CREG_DOCKERFILE:-Dockerfile}
+    command: ["true"]
+    profiles:
+      - build
+
+  validator:
+    <<: *app-image
+    container_name: "${CREG_CONTAINER_NAME:-creg-validator}"
+    user: "0:0"
+    restart: unless-stopped
+    environment:
+      <<: *validator-env
+    ports:
+      - "${CREG_API_HOST_PORT:-8080}:8080"
+      - "${CREG_GRPC_HOST_PORT:-50051}:50051"
+      - "${CREG_P2P_HOST_PORT:-9000}:9000"
+    volumes:
+      - validator-data:/data
+      - ./circuits:/app/circuits:ro
+      - ./validators:/app/validators:ro
+      - ./models:/app/models:ro
+      - ./config/sandbox:/app/config/sandbox:ro
+      - ./rules:/app/rules:ro
+      - ./testnet/certs:/app/certs:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cli:
+    <<: *app-image
+    container_name: "${CREG_CLI_CONTAINER_NAME:-creg-validator-cli}"
+    entrypoint: ["/app/creg"]
+    command: ["--help"]
+    environment:
+      CREG_NODE_URL: "http://validator:8080"
+      CREG_ETH_RPC: "${CREG_ETH_RPC:?set CREG_ETH_RPC to the shared Anvil RPC URL}"
+    depends_on:
+      validator:
+        condition: service_healthy
+    profiles:
+      - cli
+
+  tui-explorer:
+    <<: *app-image
+    container_name: "${CREG_TUI_CONTAINER_NAME:-creg-validator-tui}"
+    entrypoint: ["/app/creg"]
+    command: ["explorer"]
+    environment:
+      CREG_NODE_URL: "http://validator:8080"
+    stdin_open: true
+    tty: true
+    depends_on:
+      validator:
+        condition: service_healthy
+    profiles:
+      - tui
+
+volumes:
+  validator-data:

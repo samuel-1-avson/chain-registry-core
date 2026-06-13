@@ -1,0 +1,220 @@
+# Chain Registry 3-Node Sepolia Test
+# Two validators + one observer against live Ethereum Sepolia (chain 11155111).
+#
+# Prerequisites:
+#   cp testnet/sepolia-3node.env.example testnet/sepolia-3node.env
+#   Fill SEPOLIA_RPC_URL / CREG_ETH_RPC and validator Ed25519 keys.
+#
+# Usage:
+#   .\testnet\start-3node-test.ps1
+#   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â or manually ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
+#   docker compose -f testnet/docker-compose.3node.yml --env-file testnet/sepolia-3node.env build creg-node-1
+#   docker compose -f testnet/docker-compose.3node.yml --env-file testnet/sepolia-3node.env up -d
+
+x-creg-node-common: &creg-node-common
+  image: creg-node:local-3node
+  build:
+    context: ..
+    dockerfile: Dockerfile.windows
+  env_file:
+    - sepolia-3node.env
+    - scanner-fleet.env
+  networks:
+    - creg-3node
+  restart: unless-stopped
+
+x-creg-node-base-env: &creg-node-base-env
+  CREG_CHAIN_ID: creg-testnet-1
+  CREG_EXPECTED_L1_CHAIN_ID: "11155111"
+  # CREG_ETH_RPC comes from sepolia-3node.env (env_file) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â do not interpolate here;
+  # host-shell ${CREG_ETH_RPC} overrides the file and breaks Infura after publicnode sessions.
+  CREG_LISTEN: 0.0.0.0:8080
+  CREG_DATA_DIR: /data
+  CREG_BLOCK_INTERVAL: "5"
+  # CREG_DEV_SANDBOX: set in sepolia-3node.env only (do not interpolate from host shell â€”
+  # host ${CREG_DEV_SANDBOX:-false} overrides env_file and breaks Windows soak after edits).
+  CREG_IPFS_URL: http://ipfs:5001
+  CREG_P2P_LISTEN: /ip4/0.0.0.0/tcp/9000
+  CREG_CHAIN_SPEC_URL: http://spec-server/chain-spec.json
+  CREG_CHAIN_SPEC_OFFLINE: "false"
+  CREG_SPEC_SIGNING_PUBKEY: "0437e4adac481519cd6ae66907294c40cfcbf0bdeadd47806f6233be4bd5f82d"
+  # Sepolia contracts (defaults match testnet/chain-spec.sepolia.json; override via sepolia-3node.env)
+  CREG_REGISTRY_ADDR: ${CREG_REGISTRY_ADDR:-0x3aCfF05d00AC199412a94326eD8aA874aaA3596c}
+  CREG_STAKING_ADDR: ${CREG_STAKING_ADDR:-0xf28C63C4Aafd27025E535Ab9ab7B4daC18C96Bc2}
+  CREG_GOVERNANCE_ADDR: ${CREG_GOVERNANCE_ADDR:-0x9a14F359E2bdBb43F1526743C4A91955F29Ba59A}
+  CREG_TOKEN_ADDR: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+  CREG_ZK_VERIFIER_ADDR: ${CREG_ZK_VERIFIER_ADDR:-0x0922AE98AF1D809360BDd5D5AAd84f0D823A5cF3}
+  RUST_LOG: info,chain_registry_node=debug
+
+services:
+  # ============================================================================
+  # IPFS permission fix (Kubo runs as uid 1000, gid 100; stale volumes often root-owned)
+  # ============================================================================
+  ipfs-perms:
+    # Reuse kubo image (already pulled) to fix volume ownership before daemon starts.
+    image: ipfs/kubo:latest
+    container_name: creg-3node-ipfs-perms
+    user: "0:0"
+    volumes:
+      - ipfs-data:/data/ipfs
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /data/ipfs
+        if [ ! -f /data/ipfs/config ]; then
+          IPFS_PATH=/data/ipfs ipfs init --profile=server
+        fi
+        chown -R 1000:100 /data/ipfs
+        chmod -R u+rwX,g+rX,o-rwx /data/ipfs
+        rm -f /data/ipfs/repo.lock
+    restart: "no"
+    networks:
+      - creg-3node
+
+  # ============================================================================
+  # IPFS Node (shared)
+  # ============================================================================
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: creg-3node-ipfs
+    volumes:
+      - ipfs-data:/data/ipfs
+    ports:
+      # Host port defaults to 15001 to avoid clashing with testnet/start-ipfs.ps1 (5001).
+      - "${CREG_3NODE_IPFS_HOST_PORT:-15001}:5001"
+    networks:
+      - creg-3node
+    depends_on:
+      ipfs-perms:
+        condition: service_completed_successfully
+    # Bind API on all interfaces so Windows host port-forward (15001) accepts POST /api/v0/*.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "export IPFS_PATH=/data/ipfs; ipfs init --profile=server 2>/dev/null || true; ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001 2>/dev/null || true; exec ipfs daemon --migrate=true --enable-gc"
+    healthcheck:
+      test: ["CMD-SHELL", "ipfs id || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  # ============================================================================
+  # Chain Spec HTTP Server
+  # Serves signed chain-spec.sepolia.json so all 3 nodes fetch via URL
+  # ============================================================================
+  spec-server:
+    image: nginx:alpine
+    container_name: creg-3node-spec-server
+    volumes:
+      - ./chain-spec.sepolia.json:/usr/share/nginx/html/chain-spec.json:ro
+      - ./chain-spec.sepolia.json.sig:/usr/share/nginx/html/chain-spec.json.sig:ro
+      - ./chain-spec.sepolia.json:/usr/share/nginx/html/chain-spec.sepolia.json:ro
+      - ./chain-spec.sepolia.json.sig:/usr/share/nginx/html/chain-spec.sepolia.json.sig:ro
+      - ./nginx-spec.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      # Host port defaults to 18888 to avoid clashing with testnet/spec-server (8888).
+      - "${CREG_3NODE_SPEC_HOST_PORT:-18888}:80"
+    networks:
+      - creg-3node
+    healthcheck:
+      # Use 127.0.0.1 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Alpine wget treats localhost as ::1 but nginx may listen on IPv4 only.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/chain-spec.json > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ============================================================================
+  # Node 1 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Bootstrap Validator
+  # ============================================================================
+  creg-node-1:
+    <<: *creg-node-common
+    container_name: creg-3node-node1
+    environment:
+      <<: *creg-node-base-env
+      # Non-empty sentinel prevents invalid chain-spec bootnode placeholders from being dialed.
+      CREG_P2P_SEEDS: /dns4/creg-node-2/tcp/9000,/dns4/creg-node-3/tcp/9000
+      CREG_IS_VALIDATOR: "true"
+      CREG_VALIDATOR_KEY: ${CREG_VALIDATOR_KEY_1}
+      CREG_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+      CREG_NODE_ID: core-1
+      CREG_PEERS: http://creg-node-2:8080,http://creg-node-3:8080
+    ports:
+      - "${CREG_3NODE_NODE1_API_PORT:-28180}:8080"
+      - "${CREG_3NODE_NODE1_P2P_PORT:-29100}:9000"
+    volumes:
+      - creg-data-1:/data
+      - ./chain-spec-cache:/cache:ro
+      - ../rules:/rules:ro
+    depends_on:
+      ipfs:
+        condition: service_healthy
+      spec-server:
+        condition: service_healthy
+
+  # ============================================================================
+  # Node 2 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Validator
+  # ============================================================================
+  creg-node-2:
+    <<: *creg-node-common
+    container_name: creg-3node-node2
+    environment:
+      <<: *creg-node-base-env
+      CREG_IS_VALIDATOR: "true"
+      CREG_VALIDATOR_KEY: ${CREG_VALIDATOR_KEY_2}
+      CREG_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+      CREG_NODE_ID: validator-2
+      CREG_PEERS: http://creg-node-1:8080,http://creg-node-3:8080
+      CREG_P2P_SEEDS: /dns4/creg-node-1/tcp/9000,/dns4/creg-node-3/tcp/9000
+    ports:
+      - "${CREG_3NODE_NODE2_API_PORT:-28181}:8080"
+      - "${CREG_3NODE_NODE2_P2P_PORT:-29101}:9000"
+    volumes:
+      - creg-data-2:/data
+      - ./chain-spec-cache:/cache:ro
+      - ../rules:/rules:ro
+    depends_on:
+      ipfs:
+        condition: service_healthy
+      spec-server:
+        condition: service_healthy
+      creg-node-1:
+        condition: service_started
+
+  # ============================================================================
+  # Node 3 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Observer / Full Node
+  # ============================================================================
+  creg-node-3:
+    <<: *creg-node-common
+    container_name: creg-3node-node3
+    environment:
+      <<: *creg-node-base-env
+      CREG_IS_VALIDATOR: "false"
+      CREG_NODE_ID: observer-1
+      CREG_PEERS: http://creg-node-1:8080,http://creg-node-2:8080
+      CREG_P2P_SEEDS: /dns4/creg-node-1/tcp/9000,/dns4/creg-node-2/tcp/9000
+    ports:
+      - "${CREG_3NODE_NODE3_API_PORT:-28182}:8080"
+      - "${CREG_3NODE_NODE3_P2P_PORT:-29102}:9000"
+    volumes:
+      - creg-data-3:/data
+      - ./chain-spec-cache:/cache:ro
+    depends_on:
+      ipfs:
+        condition: service_healthy
+      spec-server:
+        condition: service_healthy
+      creg-node-1:
+        condition: service_started
+
+networks:
+  creg-3node:
+    driver: bridge
+
+volumes:
+  ipfs-data:
+  creg-data-1:
+  creg-data-2:
+  creg-data-3:

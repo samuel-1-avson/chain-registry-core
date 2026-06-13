@@ -1,0 +1,62 @@
+# TLS ingress overlay for the 3-node Sepolia public testnet (Caddy + Let's Encrypt).
+#
+# Prerequisite: DNS A records for each CREG_PUBLIC_*_HOST must point at this VM
+# before Caddy can obtain certificates.
+#
+# Usage (with fleet + public services already defined):
+#   docker compose \
+#     -f testnet/docker-compose.3node.yml \
+#     -f testnet/docker-compose.3node-services.yml \
+#     -f testnet/docker-compose.3node-ingress.yml \
+#     --env-file testnet/sepolia-3node.env \
+#     up -d caddy
+#
+# Or: .\testnet\start-3node-public.ps1 -WithIngress -WithFaucet -BaseDomain testnet.example.com -PatchChainSpec
+#
+# Set CREG_INGRESS_FAUCET=true to mount Caddyfile.with-faucet (faucet service required).
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: creg-3node-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CREG_ACME_EMAIL: ${CREG_ACME_EMAIL:?set CREG_ACME_EMAIL for Let's Encrypt}
+      CREG_PUBLIC_API_HOST: ${CREG_PUBLIC_API_HOST:?set CREG_PUBLIC_API_HOST}
+      CREG_PUBLIC_EXPLORER_HOST: ${CREG_PUBLIC_EXPLORER_HOST:?set CREG_PUBLIC_EXPLORER_HOST}
+      CREG_PUBLIC_SPEC_HOST: ${CREG_PUBLIC_SPEC_HOST:?set CREG_PUBLIC_SPEC_HOST}
+      CREG_PUBLIC_IPFS_HOST: ${CREG_PUBLIC_IPFS_HOST:?set CREG_PUBLIC_IPFS_HOST}
+      CREG_PUBLIC_FAUCET_HOST: ${CREG_PUBLIC_FAUCET_HOST:?set CREG_PUBLIC_FAUCET_HOST when using Caddyfile.with-faucet}
+      CREG_PUBLIC_WAITLIST_HOST: ${CREG_PUBLIC_WAITLIST_HOST:-}
+      CREG_PUBLIC_JOIN_HOST: ${CREG_PUBLIC_JOIN_HOST:-}
+      CREG_HUB_WEB_PORT: ${CREG_HUB_WEB_PORT:-8094}
+      CREG_HUB_API_PORT: ${CREG_HUB_API_PORT:-8095}
+    volumes:
+      # Default includes faucet vhost; set CREG_CADDYFILE=./caddy/Caddyfile when faucet is off.
+      - ${CREG_CADDYFILE:-./caddy/Caddyfile.with-faucet}:/etc/caddy/Caddyfile:ro
+      - ./caddy/waitlist.caddy:/etc/caddy/waitlist.caddy:ro
+      - ./caddy/hub.caddy:/etc/caddy/hub.caddy:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - creg-3node
+    depends_on:
+      creg-node-3:
+        condition: service_started
+      spec-server:
+        condition: service_healthy
+      web-explorer:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || wget -qO- --no-check-certificate https://127.0.0.1:443/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  caddy-data:
+  caddy-config:

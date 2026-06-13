@@ -1,0 +1,132 @@
+{
+    "comment": "Docker seccomp profile for Chain Registry sandbox containers. Based on Docker's default profile with dangerous syscalls removed.",
+    "defaultAction": "SCMP_ACT_ERRNO",
+    "defaultErrnoRet": 1,
+    "archMap": [
+        { "architecture": "SCMP_ARCH_X86_64", "subArchitectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"] },
+        { "architecture": "SCMP_ARCH_AARCH64", "subArchitectures": ["SCMP_ARCH_ARM"] }
+    ],
+    "syscalls": [
+        {
+            "comment": "File I/O",
+            "names": [
+                "read", "write", "open", "openat", "openat2", "close",
+                "stat", "fstat", "lstat", "newfstatat", "statx",
+                "lseek", "pread64", "pwrite64", "readv", "writev",
+                "access", "faccessat", "faccessat2",
+                "readlink", "readlinkat",
+                "getcwd", "rename", "renameat", "renameat2",
+                "unlink", "unlinkat", "rmdir", "mkdir", "mkdirat",
+                "symlink", "symlinkat", "link", "linkat",
+                "chmod", "fchmod", "fchmodat",
+                "chown", "fchown", "fchownat",
+                "utimensat", "futimesat",
+                "getdents", "getdents64",
+                "dup", "dup2", "dup3", "fcntl",
+                "flock", "ftruncate", "fallocate",
+                "statfs", "fstatfs",
+                "sendfile", "copy_file_range",
+                "pipe", "pipe2"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "comment": "Memory management",
+            "names": [
+                "brk", "mmap", "munmap", "mremap", "mprotect", "madvise",
+                "mincore", "msync", "memfd_create"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "comment": "Process management",
+            "names": [
+                "execve", "execveat",
+                "clone", "clone3", "fork", "vfork",
+                "wait4", "waitid", "exit", "exit_group",
+                "getpid", "getppid", "gettid",
+                "getuid", "getgid", "geteuid", "getegid",
+                "getresuid", "getresgid", "getgroups",
+                "set_tid_address", "set_robust_list", "get_robust_list",
+                "futex", "futex_waitv",
+                "sched_getaffinity", "sched_yield",
+                "prctl", "arch_prctl",
+                "prlimit64", "getrlimit",
+                "capget"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "comment": "Networking (allowed but --network=none prevents actual egress)",
+            "names": [
+                "socket", "connect", "bind", "listen",
+                "accept", "accept4",
+                "sendto", "recvfrom", "sendmsg", "recvmsg",
+                "getsockopt", "setsockopt",
+                "getsockname", "getpeername",
+                "shutdown", "socketpair"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "comment": "I/O multiplexing",
+            "names": [
+                "epoll_create", "epoll_create1", "epoll_ctl",
+                "epoll_wait", "epoll_pwait", "epoll_pwait2",
+                "poll", "ppoll", "select", "pselect6",
+                "eventfd", "eventfd2"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "comment": "ioctl - restricted to safe terminal/file operations",
+            "names": ["ioctl"],
+            "action": "SCMP_ACT_ALLOW",
+            "args": [
+                {
+                    "index": 1,
+                    "value": 21523,
+                    "op": "SCMP_CMP_EQ",
+                    "comment": "TIOCGWINSZ - get terminal size"
+                }
+            ]
+        },
+        {
+            "comment": "ioctl - allow FIONREAD",
+            "names": ["ioctl"],
+            "action": "SCMP_ACT_ALLOW",
+            "args": [
+                {
+                    "index": 1,
+                    "value": 21531,
+                    "op": "SCMP_CMP_EQ",
+                    "comment": "FIONREAD"
+                }
+            ]
+        },
+        {
+            "comment": "Signals",
+            "names": [
+                "rt_sigaction", "rt_sigprocmask", "rt_sigreturn",
+                "sigaltstack", "kill", "tgkill", "tkill"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "comment": "Time and clock",
+            "names": [
+                "clock_gettime", "clock_getres", "clock_nanosleep",
+                "gettimeofday", "nanosleep",
+                "timer_create", "timer_settime", "timer_gettime", "timer_delete"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "comment": "Miscellaneous safe syscalls",
+            "names": [
+                "uname", "sysinfo", "getrandom", "rseq"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        }
+    ]
+}

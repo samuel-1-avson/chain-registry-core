@@ -1,0 +1,108 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation (not needed for build)
+*.md
+docs/
+BLOCKCHAIN_PROJECT_REPORT.md
+CHAIN_REGISTRY_GUIDE.md
+DEEP_DIVE_ARCHITECTURE_REPORT.md
+README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts (host side - will be rebuilt in container)
+target/
+target-copilot-*/
+target-json-rpc/
+target-node-auth/
+target-node-check/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Node modules (built in container)
+explorer/node_modules/
+explorer/dist/
+hub-web/node_modules/
+hub-web/dist/
+hub-api/node_modules/
+hub-api/dist/
+
+# Test files
+tests/
+**/*_test.rs
+**/*_tests.rs
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Docker files (not needed in context)
+Dockerfile*
+docker-compose*.yml
+!docker-compose.yml
+!docker-compose.light.yml
+!docker-compose.testnet.yml
+!docker-compose.prebuilt.yml
+!docker-compose.validator.yml
+.dockerignore
+
+# Scripts that aren't needed in build
+scripts/
+!scripts/stress-test-requirements.txt
+
+# Runtime/testnet state not required for image builds
+broadcast/
+cache/
+data/
+node-1-data/
+observability/
+playground/
+tmp/
+validator-keys/
+
+# Nested generated contract/testnet artifacts not needed for Rust image builds
+contracts/build*.log
+contracts/deployments/
+contracts/out/
+contracts/test/
+testnet/artifacts/
+testnet/soak-test/
+
+# Local/demo assets not copied by the Dockerfile
+demo-v2/
+malicious-pkg/
+ml/
+secret-model/
+
+# Circuit build artifacts (will be rebuilt)
+circuits/*.r1cs
+circuits/*.wasm
+circuits/*.sym
+
+# Large data files
+*.tar.gz
+*.zip
+*.tar
+*.tgz
+
+# Logs
+*.log
+logs/

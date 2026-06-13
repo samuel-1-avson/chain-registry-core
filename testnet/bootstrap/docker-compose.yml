@@ -1,0 +1,55 @@
+# Chain Registry Bootstrap Node
+# Minimal node that only provides P2P peer discovery — no validation, no block production.
+#
+# Usage:
+#   1. Generate a persistent libp2p key: ./generate-peer-key.sh
+#   2. Fill in bootstrap.env (copy from bootstrap.env.example)
+#   3. docker compose up -d
+#   4. Note the Peer ID from logs and add to chain spec
+#
+# Bootstrap nodes need a static IP or DNS record so validators can reach them.
+
+version: "3.8"
+
+services:
+  bootstrap:
+    image: ghcr.io/chain-registry/chain-registry:latest
+    container_name: creg-bootstrap-${NODE_ID}
+    restart: unless-stopped
+    env_file:
+      - bootstrap.env
+    volumes:
+      - ./data:/data
+      - ./p2p-key:/app/p2p-key:ro
+    ports:
+      - "9000:9000/tcp"
+      - "8080:8080/tcp"
+    command:
+      - /app/creg-node
+      - --listen=0.0.0.0:8080
+      - --p2p-listen=/ip4/0.0.0.0/tcp/9000
+      - --data-dir=/data
+      - --no-validator
+      - --no-block-producer
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Optional: Cloudflare Tunnel for nodes behind NAT without port forwarding
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: creg-bootstrap-tunnel
+    restart: unless-stopped
+    env_file:
+      - bootstrap.env
+    command: tunnel --no-autoupdate run
+    profiles:
+      - tunnel

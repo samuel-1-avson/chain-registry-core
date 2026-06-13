@@ -1,0 +1,7 @@
+﻿Γ£ô Ed25519 signature valid (testnet/chain-spec.sepolia.json.sig)
+Γ£ô Spec is valid
+  chain_id:      creg-testnet-1
+  network:       Testnet
+  genesis_hash:  0x64bba051625d4bfd7f3774b983983ed6ab87fdb7d0e486e1f689123a17d81ce3
+  validators:    1
+  l1.chain_id:   11155111

@@ -1,0 +1,40 @@
+[package]
+name    = "validator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common     = { path = "../common" }
+tokio      = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+anyhow     = { workspace = true }
+thiserror  = { workspace = true }
+tracing    = { workspace = true }
+chrono     = { workspace = true }
+hex        = { workspace = true }
+sha2       = { workspace = true }
+reqwest      = { version = "0.11", features = ["json", "multipart"] }
+uuid         = { version = "1.0", features = ["v4"] }
+static_assertions = "1.1"
+flate2     = "1"
+tar        = "0.4"
+strsim     = "0.11"
+once_cell  = "1"
+pgp        = "0.11"
+wasmtime   = { workspace = true }
+wasmtime-wasi = { workspace = true }
+tempfile   = "3"
+cap-std    = "3"
+ml-validator = { path = "../ml-validator" }
+base64       = "0.22"
+ed25519-dalek = { workspace = true }
+wasm_sandbox_crate = { package = "wasm-sandbox", path = "../wasm-sandbox" }
+
+
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+wat = "1.201"

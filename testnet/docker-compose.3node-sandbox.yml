@@ -1,0 +1,34 @@
+# SANDBOX-301 overlay — Linux hosts with nsjail (privileged).
+#
+# Prerequisites:
+#   .\testnet\build-3node-secure-image.ps1   # or .sh on Linux
+#
+# Usage:
+#   docker compose -f testnet/docker-compose.3node.yml `
+#     -f testnet/docker-compose.3node-sandbox.yml `
+#     --env-file testnet/sepolia-3node.env up -d
+#
+# Or: .\testnet\start-3node-sandbox.ps1
+
+services:
+  creg-node-1:
+    image: chain-registry-node-secure:latest
+    privileged: true
+    environment:
+      CREG_DEV_SANDBOX: "false"
+    volumes:
+      - creg-data-1:/data
+      - ./chain-spec-cache:/cache:ro
+      - ../rules:/rules:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  creg-node-2:
+    image: chain-registry-node-secure:latest
+    privileged: true
+    environment:
+      CREG_DEV_SANDBOX: "false"
+    volumes:
+      - creg-data-2:/data
+      - ./chain-spec-cache:/cache:ro
+      - ../rules:/rules:ro
+      - /var/run/docker.sock:/var/run/docker.sock

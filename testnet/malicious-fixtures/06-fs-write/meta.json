@@ -1,0 +1,6 @@
+{
+  "id": "06-fs-write",
+  "category": "filesystem_write",
+  "description": "Writes via homedir path probe",
+  "expected_findings": ["SA007"]
+}

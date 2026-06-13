@@ -1,0 +1,9 @@
+{
+  "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
+  "restart_sync_seconds": 11.2,
+  "api_port": 8090,
+  "first_sync_seconds": 20.5,
+  "timestamp": "2026-05-30T08:54:39.9237815Z",
+  "chain_spec_validate": true,
+  "publish_skipped": false
+}

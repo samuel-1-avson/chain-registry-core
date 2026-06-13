@@ -1,0 +1,36 @@
+{
+  "scenarios": [
+    {
+      "name": "Kill one validator",
+      "after": "4h",
+      "action": "kill_validator",
+      "target": "validator-3",
+      "duration": "30m"
+    },
+    {
+      "name": "Restart all validators",
+      "after": "8h",
+      "action": "restart_all"
+    },
+    {
+      "name": "Publish burst",
+      "after": "12h",
+      "action": "publish_burst",
+      "count": 100,
+      "duration": "60s"
+    },
+    {
+      "name": "Network partition",
+      "after": "16h",
+      "action": "network_partition",
+      "partition": ["validator-1", "validator-2"],
+      "duration": "15m"
+    },
+    {
+      "name": "L1 RPC outage",
+      "after": "20h",
+      "action": "l1_outage",
+      "duration": "15m"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+name: Consensus Evidence
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - ".github/workflows/consensus-evidence.yml"
+      - "config/consensus-evidence/**"
+      - "scripts/validate-consensus-evidence.sh"
+      - "scripts/validate-consensus-evidence.mjs"
+      - "crates/common/src/package.rs"
+      - "crates/consensus/src/vote_accumulator.rs"
+      - "crates/node/src/api.rs"
+      - "crates/node/src/gossip.rs"
+      - "crates/node/src/p2p.rs"
+      - "crates/node/src/sync.rs"
+      - "crates/node/src/validator_pipeline.rs"
+      - "crates/validator/**"
+      - "testnet/malicious-fixtures/**"
+      - "Cargo.lock"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/consensus-evidence.yml"
+      - "config/consensus-evidence/**"
+      - "scripts/validate-consensus-evidence.sh"
+      - "scripts/validate-consensus-evidence.mjs"
+      - "crates/common/src/package.rs"
+      - "crates/consensus/src/vote_accumulator.rs"
+      - "crates/node/src/api.rs"
+      - "crates/node/src/gossip.rs"
+      - "crates/node/src/p2p.rs"
+      - "crates/node/src/sync.rs"
+      - "crates/node/src/validator_pipeline.rs"
+      - "crates/validator/**"
+      - "testnet/malicious-fixtures/**"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: .
+
+jobs:
+  consensus-evidence:
+    name: Validate evidence-bound votes
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends protobuf-compiler libprotobuf-dev
+
+      - name: Validate scanner profile and evidence fixtures
+        run: |
+          bash -n scripts/validate-consensus-evidence.sh
+          node scripts/validate-consensus-evidence.mjs --help
+          ./scripts/validate-consensus-evidence.sh --help
+          ./scripts/validate-consensus-evidence.sh
+
+      - name: Run focused vote consensus tests
+        run: |
+          cargo test --locked -p consensus evidence_votes --lib
+          cargo test --locked -p common -p consensus vote_accumulator --lib
+          cargo test --locked -p validator malicious_fixture_suite_static_analysis

@@ -1,0 +1,6 @@
+{
+  "allowed_network_hosts": [],
+  "allowed_fs_writes": [],
+  "spawns_processes": false,
+  "description": "Hardened Security Verification Demo"
+}

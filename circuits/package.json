@@ -1,0 +1,15 @@
+{
+  "name": "chain-registry-circuits",
+  "version": "1.0.0",
+  "description": "ZK Circuits for Chain Registry double-sign slashing evidence",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "circomlib": "^2.0.5"
+  },
+  "devDependencies": {},
+  "keywords": ["zk", "circom", "blockchain", "slashing"],
+  "license": "MIT"
+}

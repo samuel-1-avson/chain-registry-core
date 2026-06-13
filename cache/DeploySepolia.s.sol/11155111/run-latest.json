@@ -1,0 +1,49 @@
+{
+  "transactions": [
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "rpc": "https://ethereum-sepolia-rpc.publicnode.com"
+    }
+  ]
+}

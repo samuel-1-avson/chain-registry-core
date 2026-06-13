@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "evidence_bundle_id": "evidence-npm-leftpad-1.3.0-2026-05-17",
+  "package": {
+    "ecosystem": "npm",
+    "name": "leftpad",
+    "version": "1.3.0",
+    "canonical": "npm:leftpad@1.3.0",
+    "content_hash": "d9b1f3e2c4a5067890abcdef1234567890abcdef1234567890abcdef12345678"
+  },
+  "scanner_profile_digest": "05426d0e074e05bf20a828d6df580983142dd1d3af01f3f8fcedcb2b4eecf4b0",
+  "analysis_bundles": {
+    "policy_bundle_id": "policy-bundle-2026-05-17",
+    "feature_schema_id": "feature-schema-v1",
+    "expert_bundle_id": "expert-rules-2026-05-17",
+    "embedding_model_id": "embedding-disabled-deterministic-v1",
+    "index_epoch": "index-epoch-2026-05-17",
+    "threshold_profile_id": "threshold-profile-v1",
+    "llm_prompt_profile_id": "llm-advisory-disabled-v1",
+    "osv_snapshot_epoch": "osv-off"
+  },
+  "deterministic_risk": {
+    "score": 12,
+    "band": "low",
+    "disposition": "approve",
+    "reasons": [
+      "No critical deterministic indicators in fixture package"
+    ]
+  },
+  "findings": [],
+  "artifacts": {
+    "static_analysis_sha256": "18f5384d58bcb1bba0bcd9e6a6781d1a6c1ea7b709eac778c0e74df8556e6b92",
+    "yara_report_sha256": "b83d7f0a5f1c2e3b0c4d5a69788766554433221100ffeeddccbbaa9988776655",
+    "sandbox_report_sha256": "4b68ab3847feda7d6c62c1fbcbeebfa35eab7351ed5e78f4ddadea5df64b8015"
+  },
+  "evidence_digest": "4f51ed3d981cb551c448174b22878141d7b9ee48588ee2c6874b2fec3d2250eb",
+  "signed_by": [
+    {
+      "key_id": "validator-fixture-key-1",
+      "algorithm": "ed25519",
+      "signature": "fixture-signature"
+    }
+  ]
+}

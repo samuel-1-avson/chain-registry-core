@@ -1,0 +1,29 @@
+{
+  "name": "chain-registry-security",
+  "displayName": "Chain Registry Security",
+  "description": "Real-time AI and PBFT consensus dependency checking for package.json.",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:json"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+       {
+          "command": "chainRegistry.scan",
+          "title": "Chain Registry: Scan current dependencies"
+       }
+    ]
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.2.0",
+    "ws": "^8.13.0"
+  }
+}

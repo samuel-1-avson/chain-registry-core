@@ -1,0 +1,104 @@
+{
+  "chain_id": "creg-testnet-1",
+  "network": "testnet",
+  "genesis_time": "2026-04-01T00:00:00Z",
+  "description": "Chain Registry Testnet Genesis Configuration",
+  "architecture_note": "Permissionless testnet — bootstrap host runs node-1; additional validators join via docker-compose.validator.yml. Block-time and stake parameters mirror the chain-spec template at testnet/chain-spec.example.json.",
+  
+  "initial_validators": [
+    {
+      "id": "node-1",
+      "alias": "Primary Validator",
+      "stake": 100000000000000000000,
+      "reputation": 100,
+      "commission": 5,
+      "is_bootnode": true,
+      "multiaddr": "/ip4/127.0.0.1/tcp/9000"
+    }
+  ],
+  
+  "token_distribution": {
+    "description": "Testnet token distribution (tCREG)",
+    "accounts": [
+      {
+        "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "balance": "10000000000000000000000000",
+        "role": "deployer"
+      },
+      {
+        "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "balance": "1000000000000000000000000",
+        "role": "faucet"
+      }
+    ],
+    "total_supply": "11000000000000000000000000"
+  },
+  
+  "consensus_params": {
+    "block_time_seconds": 5,
+    "quorum_percentage": 67,
+    "min_validator_stake": "100000000000000000",
+    "min_publisher_stake": "1000000000000000",
+    "unbonding_period_seconds": 300,
+    "slash_penalty_low": 2,
+    "slash_penalty_medium": 10,
+    "slash_penalty_critical": 30,
+    "max_validators": 50
+  },
+  
+  "economic_params": {
+    "description": "Testnet economic parameters",
+    "block_rewards_enabled": false,
+    "work_rewards_enabled": true,
+    "package_verification_reward_min": "500000000000000000",
+    "package_verification_reward_max": "1000000000000000000",
+    "zk_validation_fee": "1000000000000000",
+    "base_premium_rate": 100
+  },
+  
+  "contract_addresses": {
+    "description": "Populated after deployment",
+    "registry": "",
+    "staking": "",
+    "reputation": "",
+    "creg_token": "",
+    "governance": "",
+    "zk_verifier": "",
+    "private_registry": "",
+    "cross_chain": "",
+    "insurance": ""
+  },
+  
+  "services": {
+    "ipfs": {
+      "api_port": 5001,
+      "gateway_port": 8081,
+      "swarm_port": 4001
+    },
+    "ethereum": {
+      "rpc_port": 8545,
+      "chain_id": 31337,
+      "type": "anvil"
+    },
+    "node": {
+      "api_port": 8080,
+      "grpc_port": 50051,
+      "p2p_port": 9000
+    },
+    "faucet": {
+      "port": 8082,
+      "drip_amount": "1000000000000000000000",
+      "cooldown_seconds": 60
+    }
+  },
+  
+  "feature_flags": {
+    "zk_validation": true,
+    "ml_validation": true,
+    "wasm_sandbox": true,
+    "private_registries": true,
+    "cross_chain": true,
+    "insurance": true,
+    "threshold_encryption": true
+  }
+}

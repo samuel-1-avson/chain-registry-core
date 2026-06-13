@@ -1,0 +1,6 @@
+{
+  "id": "02-install-script",
+  "category": "install_scripts",
+  "description": "postinstall hook with raw HTTP client",
+  "expected_findings": ["SA006"]
+}

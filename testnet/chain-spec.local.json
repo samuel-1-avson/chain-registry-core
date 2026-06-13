@@ -1,0 +1,91 @@
+{
+  "spec_version": 1,
+  "chain_id": "creg-testnet-1",
+  "network": "testnet",
+  "phase": "alpha",
+  "genesis_time": "2026-05-01T00:00:00Z",
+  "genesis_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "consensus_params": {
+    "block_time_seconds": 5,
+    "vote_timeout_ms": 10000,
+    "quorum_percentage": 67,
+    "min_validator_stake_wei": "100000000000000000000",
+    "min_publisher_stake_wei": "1000000000000000000",
+    "unbonding_period_seconds": 86400,
+    "slash_penalty_low_bp": 200,
+    "slash_penalty_medium_bp": 1000,
+    "slash_penalty_critical_bp": 3000,
+    "max_validators": 50
+  },
+  "feature_flags": {
+    "zk_validation": true,
+    "ml_validation": true,
+    "wasm_sandbox": true,
+    "private_registries": true,
+    "cross_chain": false,
+    "insurance": false,
+    "threshold_encryption": false
+  },
+  "l1": {
+    "name": "anvil-local",
+    "chain_id": 31337,
+    "block_explorer": "http://localhost:8545",
+    "min_finality_blocks": 1
+  },
+  "contracts": {
+    "governance": "0x0000000000000000000000000000000000000000",
+    "registry": "0x0000000000000000000000000000000000000000",
+    "staking": "0x0000000000000000000000000000000000000000",
+    "reputation": "0x0000000000000000000000000000000000000000",
+    "creg_token": "0x0000000000000000000000000000000000000000",
+    "zk_verifier": "0x0000000000000000000000000000000000000000",
+    "appeal": "0x0000000000000000000000000000000000000000",
+    "validator_rewards": "0x0000000000000000000000000000000000000000",
+    "vrf": "0x0000000000000000000000000000000000000000"
+  },
+  "bootnodes": [
+    {
+      "id": "node-1",
+      "operator": "local-test",
+      "region": "local",
+      "multiaddr": "/ip4/creg-node-1/tcp/9000/p2p/12D3KooWGenesis"
+    }
+  ],
+  "validator_set": {
+    "version": 1,
+    "last_updated": "2026-05-01T00:00:00Z",
+    "epoch_block_height": 0,
+    "validators": [
+      {
+        "id": "validator-1",
+        "alias": "Local Validator 1",
+        "pubkey": "468995cdd3c27569e004c89098c44bf584b1a4c6cd89a203fc47825f48684964",
+        "eth_address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "stake": 100,
+        "reputation": 100,
+        "status": "active"
+      },
+      {
+        "id": "validator-2",
+        "alias": "Local Validator 2",
+        "pubkey": "314019a4fc3d9b3b613a2c80558c069d7ef157386e81befefcfd88d4eaf0b768",
+        "eth_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "stake": 100,
+        "reputation": 100,
+        "status": "active"
+      }
+    ]
+  },
+  "services": {
+    "ipfs_gateway": "http://ipfs:8080",
+    "ipfs_api": "http://ipfs:5001",
+    "faucet": "http://faucet:8081",
+    "explorer": "http://explorer:3000",
+    "metrics": "http://localhost:9090"
+  },
+  "signing": {
+    "signature_algorithm": "ed25519",
+    "signing_key_pubkey_hex": "0437e4adac481519cd6ae66907294c40cfcbf0bdeadd47806f6233be4bd5f82d",
+    "detached_signature_url": "http://spec-server/chain-spec.json.sig"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "id": "04-typosquat",
+  "category": "typosquat",
+  "description": "Package name one edit from lodash (lodish)",
+  "expected_findings": ["SA010"]
+}

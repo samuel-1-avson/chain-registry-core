@@ -1,0 +1,40 @@
+[package]
+name = "insurance"
+version = "0.1.0"
+edition = "2021"
+authors = ["Chain Registry Team"]
+description = "Package insurance management for Chain Registry"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# Math
+statrs = "0.16"
+
+# HTTP client for chain data lookups
+reqwest = { workspace = true, features = ["blocking", "json"] }
+urlencoding = "2.1"
+
+# Common crate
+common = { path = "../common" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[lints]
+workspace = true

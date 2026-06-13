@@ -1,0 +1,31 @@
+# Ollama sidecar for Sepolia validators (Lane B + Lane C).
+#
+# Usage with external validator compose:
+#   docker compose -f testnet/docker-compose.validator.yml -f testnet/docker-compose.llm.yml --profile llm up -d
+#
+# Then in testnet/.env:
+#   CREG_LLM_ENABLED=true
+#   CREG_INTELLIGENCE_ENABLED=true
+#   CREG_OLLAMA_URL=http://ollama:11434
+
+version: "3.8"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: creg-validator-ollama
+    profiles: ["llm"]
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama-validator-data:/root/.ollama
+    restart: unless-stopped
+
+  creg-node:
+    depends_on:
+      - ollama
+    environment:
+      CREG_OLLAMA_URL: http://ollama:11434
+
+volumes:
+  ollama-validator-data:

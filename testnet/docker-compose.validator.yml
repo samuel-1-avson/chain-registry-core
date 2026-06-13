@@ -1,0 +1,120 @@
+# Chain Registry — Single Validator Node (Sepolia)
+#
+# Use this to run a single validator or full node against the live Sepolia testnet.
+# This does NOT include Anvil — it connects to real Ethereum Sepolia.
+#
+# Usage:
+#   1. cp .env.example .env
+#   2. Edit .env — set your CREG_NODE_ID, CREG_ETH_RPC_URL, CREG_VALIDATOR_KEY, etc.
+#   3. docker compose -f docker-compose.validator.yml up -d
+#   4. docker compose -f docker-compose.validator.yml logs -f
+#
+# If you are the FIRST node (bootstrap), leave CREG_P2P_SEEDS empty.
+# If you are joining an existing network, set CREG_P2P_SEEDS to the bootstrap multiaddr.
+
+version: "3.8"
+
+services:
+  creg-node:
+    # Use pre-built image (fastest) or build from source
+    image: ghcr.io/chain-registry/chain-registry:latest
+    # To build locally instead:
+    # build:
+    #   context: ..
+    #   dockerfile: Dockerfile
+    #   args:
+    #     PROFILE: minimal
+    container_name: creg-node-${CREG_NODE_ID:-validator}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Ensure these are set; .env provides defaults
+      CREG_CHAIN_SPEC_URL: ${CREG_CHAIN_SPEC_URL}
+      CREG_SPEC_SIGNING_PUBKEY: ${CREG_SPEC_SIGNING_PUBKEY}
+      CREG_ETH_RPC_URL: ${CREG_ETH_RPC_URL}
+      CREG_NODE_ID: ${CREG_NODE_ID}
+      CREG_DATA_DIR: /data
+      CREG_LISTEN: 0.0.0.0:8080
+      CREG_P2P_LISTEN: /ip4/0.0.0.0/tcp/9000
+      CREG_IPFS_URL: ${CREG_IPFS_URL:-}
+      CREG_ML_ENABLED: ${CREG_ML_ENABLED:-true}
+      CREG_ML_MODEL_PATH: ${CREG_ML_MODEL_PATH:-/app/models}
+      # Lane B — validator Stage 4 LLM (opt-in; set CREG_LLM_ENABLED=true in .env)
+      CREG_LLM_ENABLED: ${CREG_LLM_ENABLED:-false}
+      CREG_LLM_PROVIDERS: ${CREG_LLM_PROVIDERS:-ollama,openrouter}
+      CREG_LLM_MODEL: ${CREG_LLM_MODEL:-llama3.2}
+      CREG_OLLAMA_URL: ${CREG_OLLAMA_URL:-http://host.docker.internal:11434}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Lane C — post-consensus intelligence (explorer API)
+      CREG_INTELLIGENCE_ENABLED: ${CREG_INTELLIGENCE_ENABLED:-false}
+      CREG_INTELLIGENCE_AUTO: ${CREG_INTELLIGENCE_AUTO:-true}
+    ports:
+      - "8080:8080"
+      - "9000:9000"
+      - "50051:50051"
+    volumes:
+      - ./node-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Optional: Local IPFS node for package storage
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: creg-ipfs
+    restart: unless-stopped
+    volumes:
+      - ipfs-data:/data/ipfs
+    ports:
+      - "127.0.0.1:5001:5001"
+    environment:
+      IPFS_PROFILE: server
+      IPFS_SWARM_KEY: /key/swarm
+    sysctls:
+      - net.core.rmem_max=2500000
+      - net.core.wmem_max=2500000
+    command: >
+      daemon --migrate=true --enable-gc
+    profiles:
+      - ipfs
+
+  # Optional: Prometheus + Grafana monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: creg-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: creg-grafana
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/grafana:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    profiles:
+      - monitoring
+
+volumes:
+  ipfs-data:
+  prometheus-data:
+  grafana-data:

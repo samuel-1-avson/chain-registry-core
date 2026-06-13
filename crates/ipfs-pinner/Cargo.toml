@@ -1,0 +1,32 @@
+[package]
+name = "ipfs-pinner"
+version = "0.1.0"
+edition = "2021"
+authors = ["Chain Registry Team"]
+description = "IPFS pinning rewards and verification system"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+async-trait = "0.1"
+
+# Ethereum/Contracts
+alloy = { workspace = true }
+alloy-sol-types = { workspace = true }
+
+# Internal
+common = { path = "../common" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+
+[lints]
+workspace = true

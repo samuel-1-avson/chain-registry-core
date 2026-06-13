@@ -1,0 +1,6 @@
+{
+  "id": "03-obfuscated",
+  "category": "obfuscation",
+  "description": "base64 decode + eval pattern",
+  "expected_findings": ["SA002"]
+}

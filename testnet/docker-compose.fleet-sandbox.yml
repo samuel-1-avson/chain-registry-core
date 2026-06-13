@@ -1,0 +1,32 @@
+# MAL-001 overlay — real behavioural sandbox (nsjail) for the GCP validator fleet.
+#
+# Public validator profiles must NOT run with CREG_DEV_SANDBOX=true.
+# This overlay switches the two consensus validators to the secure image
+# (chain-registry-node-secure, built on the VM by start-validator-fleet-gcp.sh)
+# and forces CREG_DEV_SANDBOX=false regardless of sepolia-3node.env.
+#
+# creg-node-3 is an observer (CREG_IS_VALIDATOR=false) and never votes, so it
+# stays on the base image; it still inherits CREG_DEV_SANDBOX from the env file.
+#
+# Usage (applied automatically by start-validator-fleet-gcp.sh unless
+# CREG_FLEET_DEV_SANDBOX=1):
+#   docker compose -f testnet/docker-compose.validator-fleet.yml \
+#     -f testnet/docker-compose.fleet-sandbox.yml \
+#     --env-file testnet/sepolia-3node.env up -d
+
+services:
+  creg-node-1:
+    image: chain-registry-node-secure:fleet
+    # nsjail needs CLONE_NEW* namespaces + seccomp; privileged is required inside
+    # the fleet VM's Docker (same posture as docker-compose.3node-sandbox.yml).
+    privileged: true
+    environment:
+      CREG_DEV_SANDBOX: "false"
+      CREG_PUBLIC_VALIDATOR: "true"
+
+  creg-node-2:
+    image: chain-registry-node-secure:fleet
+    privileged: true
+    environment:
+      CREG_DEV_SANDBOX: "false"
+      CREG_PUBLIC_VALIDATOR: "true"

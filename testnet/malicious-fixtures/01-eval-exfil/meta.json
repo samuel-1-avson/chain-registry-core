@@ -1,0 +1,6 @@
+{
+  "id": "01-eval-exfil",
+  "category": "exfiltration",
+  "description": "eval() of attacker-controlled payload",
+  "expected_findings": ["SA001"]
+}

@@ -1,0 +1,24 @@
+{
+  "entries": {
+    "4d0c0c84e2ef8706e8a1e1c0e3e6e9d5f8b2a7f1c3e5d9b4a6e2c8f0d4b7a3e1": {
+      "label": "event-stream@3.3.6 bitcoin-stealing postinstall (flatmap-stream)",
+      "threat_level": 5,
+      "source": "CVE-2018-16763 / npm-security-2018-11"
+    },
+    "8f14e45fceea167a5a36dedd4bea2543739f5b4e2d5f2a3c1b7e8d9f0a6c4b2": {
+      "label": "ua-parser-js@0.7.29/1.0.0/2.0.0 cryptominer+RAT postinstall",
+      "threat_level": 5,
+      "source": "CVE-2021-41265 / npm-security-2021-10"
+    },
+    "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2": {
+      "label": "node-ipc@9.2.2 data-wiping payload (protestware)",
+      "threat_level": 5,
+      "source": "CVE-2022-23812 / npm-security-2022-03"
+    },
+    "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08": {
+      "label": "colors@1.4.44-liberty-2 infinite loop payload (protestware)",
+      "threat_level": 4,
+      "source": "npm-security-2022-01"
+    }
+  }
+}

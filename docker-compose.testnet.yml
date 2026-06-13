@@ -1,0 +1,473 @@
+# docker-compose.testnet.yml
+# Spins up a single-validator Chain Registry testnet for Phase 1 validation.
+# 
+# Architecture:
+#   - 1 shared IPFS node
+#   - 1 shared Anvil (local Ethereum L1)
+#   - 1 validator node (node-1)
+# 
+# Usage:
+#   1. Generate keys: .\scripts\generate-testnet-keys.ps1 -Nodes 1
+#   2. Deploy:        docker compose --env-file .env.testnet -f docker-compose.testnet.yml up -d --build
+#   3. Monitor:       docker compose -f docker-compose.testnet.yml logs -f
+
+name: creg-testnet
+
+# For one-node-per-computer testnets, run the shared services from this file on
+# the bootstrap machine and use docker-compose.validator.yml on each validator host.
+
+# When both `image:` and `build:` are specified Docker builds the image and tags
+# it with the given name — so every service sharing this anchor builds once and
+# subsequent `docker compose up` runs use the cached image.
+x-app-image: &app-image
+  image: chain-registry-app:latest
+  build:
+    context: .
+    dockerfile: ${CREG_DOCKERFILE:-Dockerfile}
+
+x-web-explorer-image: &web-explorer-image
+  image: chain-registry-web-explorer:latest
+  build:
+    context: ./explorer
+    dockerfile: Dockerfile
+    args:
+      VITE_CREG_TOKEN: ${TESTNET_TOKEN_ADDR:-}
+      VITE_STAKING_ADDR: ${TESTNET_STAKING_ADDR:-}
+      VITE_DEV_MODE: ${VITE_DEV_MODE:-true}
+      # Leave VITE_API_BASE empty so the SPA uses the same origin (port 3007).
+      # nginx proxies /v1/* → node-1:8080 so no CORS issues arise.
+      VITE_API_BASE: ""
+
+x-node-base: &node-base
+  <<: *app-image
+  restart: unless-stopped
+  depends_on:
+    ipfs:
+      condition: service_started
+    anvil:
+      condition: service_healthy
+    deploy-contracts:
+      condition: service_completed_successfully
+  volumes:
+    - ./circuits:/app/circuits:ro
+    - ./validators:/app/validators:ro
+    - ./models:/app/models:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./testnet/certs:/app/certs:ro
+  environment: &node-env
+    CREG_TESTNET: "true"
+    CREG_DATA_DIR: "/data"
+    CREG_IS_VALIDATOR: "true"
+    CREG_ETH_RPC: "${CREG_DOCKER_ETH_RPC:-http://anvil:8545}"
+    CREG_IPFS_URL: "${CREG_DOCKER_IPFS_URL:-http://ipfs:5001}"
+    CREG_TOKEN_ADDR: "${TESTNET_TOKEN_ADDR:-}"
+    CREG_STAKING_ADDR: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+    CREG_BLOCK_INTERVAL: "2"
+    CREG_SINGLE_VALIDATOR_MODE: "true"
+    CREG_DEV_SANDBOX: "${CREG_DEV_SANDBOX:-true}"
+    CREG_ZK_ENABLED: "true"
+    CREG_ML_ENABLED: "true"
+    CREG_ML_MODEL_PATH: "/app/models"
+    CREG_WASM_ENABLED: "true"
+    CREG_WASM_VALIDATORS_PATH: "/app/validators"
+    CREG_REGISTRY_ADDR: "${TESTNET_REGISTRY_ADDR:-}"
+    CREG_GOVERNANCE_ADDR: "${TESTNET_GOVERNANCE_ADDR:-}"
+    # TLS is opt-in: leave blank to run plain HTTP (default for local testnet).
+    # To enable, generate certs with scripts/generate-tls-certs.sh and set:
+    #   CREG_TLS_CERT=/app/certs/server.crt  CREG_TLS_KEY=/app/certs/server.key
+    CREG_TLS_CERT: "${CREG_TLS_CERT:-}"
+    CREG_TLS_KEY: "${CREG_TLS_KEY:-}"
+    RUST_LOG: "info,chain_registry_node=debug,consensus=debug"
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+services:
+
+  # ── Shared Runtime Images ───────────────────────────────────────────────────
+  # Build once, then reuse for every node/faucet/containerized CLI service.
+  app-image:
+    <<: *app-image
+    build:
+      context: .
+      dockerfile: ${CREG_DOCKERFILE:-Dockerfile}
+    command: ["true"]
+    profiles:
+      - build
+
+  web-explorer-image:
+    <<: *web-explorer-image
+    build:
+      context: ./explorer
+      dockerfile: Dockerfile
+      args:
+        VITE_CREG_TOKEN: ${TESTNET_TOKEN_ADDR:-}
+        VITE_STAKING_ADDR: ${TESTNET_STAKING_ADDR:-}
+        VITE_DEV_MODE: ${VITE_DEV_MODE:-true}
+        VITE_API_BASE: ""
+    command: ["true"]
+    profiles:
+      - build
+
+  secure-node-image:
+    image: chain-registry-node-secure:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.secure
+    depends_on:
+      - app-image
+    command: ["true"]
+    profiles:
+      - build
+
+  # ── Shared IPFS ─────────────────────────────────────────────────────────────
+  ipfs:
+    image: ipfs/kubo:v0.27.0
+    container_name: creg-testnet-ipfs
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8081:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+      - ./scripts/ipfs-cors-container.sh:/container-init.d/ipfs-cors.sh:ro
+    command: ["daemon", "--init", "--init-profile=server", "--routing=dhtclient"]
+    environment:
+      - IPFS_PROFILE=server
+    sysctls:
+      - net.core.rmem_max=2500000
+      - net.core.wmem_max=2500000
+    restart: unless-stopped
+
+  # ── Shared Anvil (local Ethereum) ───────────────────────────────────────────
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:v0.3.0
+    container_name: creg-testnet-anvil
+    entrypoint: ["anvil", "--host", "0.0.0.0", "--chain-id", "31337", "--block-time", "1", "--accounts", "10"]
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./contracts:/contracts
+      - anvil-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Contract Deployer ───────────────────────────────────────────────────────
+  deploy-contracts:
+    image: ghcr.io/foundry-rs/foundry:v0.3.0
+    container_name: creg-testnet-deploy
+    depends_on:
+      anvil:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-lc"]
+    volumes:
+      - ./:/workspace
+    working_dir: /workspace
+    command:
+      - |
+        set -e
+        echo 'Waiting for Anvil...'
+        sleep 3
+        mkdir -p contracts/deployments testnet/artifacts
+        # Idempotency check: governance is always at this deterministic address (CREATE from
+        # deployer 0xf39F... at nonce 0). If it already has code, the chain was already set
+        # up in a previous run — skip re-deployment so we don't create duplicates.
+        GOVERNANCE_CODE=$$(cast code 0x5FbDB2315678afecb367f032d93F642f64180aa3 --rpc-url http://anvil:8545 2>/dev/null || true)
+        if echo "$$GOVERNANCE_CODE" | grep -qE '^0x.{4,}'; then
+          echo 'Contracts already deployed at expected addresses — skipping forge script.'
+          exit 0
+        fi
+        forge build
+        echo 'Deploying contracts...'
+        forge script contracts/script/Deploy.s.sol:DeployChainRegistry \
+          --rpc-url http://anvil:8545 \
+          --broadcast \
+          -vvvv
+    environment:
+      # Deployer and bridge keys MUST be set in .env.testnet.
+      DEPLOYER_KEY: "${DEPLOYER_KEY:?DEPLOYER_KEY must be set in .env.testnet}"
+      CREG_BRIDGE_KEY: "${CREG_BRIDGE_KEY:?CREG_BRIDGE_KEY must be set in .env.testnet}"
+      FAUCET_ADDRESS: "${FAUCET_ADDRESS:-0x70997970C51812dc3A010C7d01b50e0d17dc79C8}"
+      TESTNET_MODE: "true"
+      DEPLOYMENT_MANIFEST_PATH: "contracts/deployments/latest.json"
+      FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+      ETHERSCAN_API_KEY: "dummy"
+
+  # ── PostgreSQL Mirror (optional but recommended for testnet) ─────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: creg-testnet-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-creg}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-creg}
+      - POSTGRES_DB=${POSTGRES_DB:-chain_registry}
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./testnet/init-testnet-db.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-creg} -d ${POSTGRES_DB:-chain_registry}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Validator Node ───────────────────────────────────────────────────────────
+  # Single validator node for this Docker host.
+
+  node-1:
+    <<: *node-base
+    image: chain-registry-node-secure:latest
+    container_name: creg-testnet-node-1
+    privileged: true # Required for nsjail kernel namespaces
+    networks:
+      default:
+        aliases:
+          - node
+    ports:
+      - "8080:8080"
+      - "50057:50051"
+      - "9000:9000"
+    volumes:
+      - node-1-data:/data
+      - ./circuits:/app/circuits:ro
+      - ./validators:/app/validators:ro
+      - ./models:/app/models:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./testnet/certs:/app/certs:ro
+    # Override depends_on to add postgres (node uses CREG_PG_URL for indexing).
+    depends_on:
+      ipfs:
+        condition: service_started
+      anvil:
+        condition: service_healthy
+      deploy-contracts:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *node-env
+      CREG_NODE_ID: "node-1"
+      # Validator/Bridge keys will be fetched from Vault, but keeping env overrides for fallback
+      CREG_VALIDATOR_KEY: "${NODE1_VALIDATOR_KEY}"
+      CREG_BRIDGE_KEY: "${CREG_BRIDGE_KEY:?CREG_BRIDGE_KEY must be set in .env.testnet}"
+      CREG_VAULT_ADDR: "http://vault:8200"
+      CREG_VAULT_TOKEN: "root"
+      CREG_LISTEN: "0.0.0.0:8080"
+      CREG_P2P_LISTEN: "/ip4/0.0.0.0/tcp/9000"
+      CREG_P2P_SEEDS: "${CREG_P2P_SEEDS:-}"
+      CREG_VALIDATOR_SET: "${VALIDATOR_SET_JSON}"
+      CREG_PG_URL: "${CREG_PG_URL:-postgres://${POSTGRES_USER:-creg}:${POSTGRES_PASSWORD:-creg}@postgres:5432/${POSTGRES_DB:-chain_registry}}"
+
+  # ── CLI helper service ──────────────────────────────────────────────────────
+  cli:
+    <<: *app-image
+    container_name: creg-testnet-cli
+    entrypoint: ["/app/creg"]
+    command: ["--help"]
+    environment:
+      CREG_NODE_URL: "http://node-1:8080"
+      CREG_ETH_RPC: "http://anvil:8545"
+    depends_on:
+      - node-1
+    profiles:
+      - cli
+
+  # ── TUI Explorer (terminal UI for testnet) ────────────────────────────────
+  # NEW v0.3.0: Interactive terminal-based blockchain explorer
+  # Usage: docker compose -f docker-compose.testnet.yml run --rm tui-explorer
+  tui-explorer:
+    <<: *app-image
+    container_name: creg-testnet-tui-explorer
+    entrypoint: ["/app/creg"]
+    command: ["explorer"]
+    environment:
+      CREG_NODE_URL: "http://node-1:8080"
+    stdin_open: true
+    tty: true
+    depends_on:
+      node-1:
+        condition: service_healthy
+    profiles:
+      - tui
+
+  # ── Faucet Service ─────────────────────────────────────────────────────────
+  faucet:
+    <<: *app-image
+    container_name: creg-testnet-faucet
+    entrypoint: ["/app/faucet"]
+    environment:
+      FAUCET_PORT: "${FAUCET_PORT:-8082}"
+      FAUCET_RPC_URL: "${FAUCET_RPC_URL:-http://anvil:8545}"
+      # Key MUST be set in .env.testnet — no hardcoded fallback.
+      FAUCET_PRIVATE_KEY: "${FAUCET_PRIVATE_KEY:?FAUCET_PRIVATE_KEY must be set in .env.testnet}"
+      FAUCET_ADDRESS: "${FAUCET_ADDRESS:?FAUCET_ADDRESS must be set in .env.testnet}"
+      FAUCET_TOKEN_CONTRACT: "${TESTNET_TOKEN_ADDR:-}"
+      FAUCET_DRIP_AMOUNT: "${FAUCET_DRIP_AMOUNT:-1000000000000000000000}"
+      FAUCET_NATIVE_DRIP_AMOUNT: "${FAUCET_NATIVE_DRIP_AMOUNT:-100000000000000000}"
+      FAUCET_COOLDOWN_SECS: "${FAUCET_COOLDOWN_SECS:-60}"
+      FAUCET_IP_COOLDOWN_SECS: "${FAUCET_IP_COOLDOWN_SECS:-60}"
+      FAUCET_MAX_BALANCE: "${FAUCET_MAX_BALANCE:-10000000000000000000000}"
+      FAUCET_NATIVE_MAX_BALANCE: "${FAUCET_NATIVE_MAX_BALANCE:-1000000000000000000}"
+      # PoW defaults to ENABLED. Set FAUCET_POW_DISABLED=true in .env.testnet only
+      # for internal testing where the browser PoW friction is unwanted.
+      FAUCET_POW_DISABLED: "${FAUCET_POW_DISABLED:-false}"
+      FAUCET_EXPLORER_URL: "http://localhost:3007"
+      FAUCET_PUBLIC_RPC_URL: "http://localhost:8545"
+      FAUCET_CHAIN_ID: "31337"
+      # Postgres connection for persistent rate-limit state (survives container restarts).
+      FAUCET_PG_URL: "${CREG_PG_URL:-postgres://creg:creg@postgres:5432/chain_registry}"
+      # Admin API token — change in production (TX-017: pause/resume/status endpoints)
+      FAUCET_ADMIN_TOKEN: "${FAUCET_ADMIN_TOKEN:-testnet-admin-secret}"
+      RUST_LOG: "info"
+    ports:
+      - "8082:8082"
+    depends_on:
+      anvil:
+        condition: service_healthy
+      deploy-contracts:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Sponsored Transaction Relayer ─────────────────────────────────────────
+  relayer:
+    <<: *app-image
+    container_name: creg-testnet-relayer
+    entrypoint: ["/app/creg-relayer"]
+    environment:
+      RELAYER_PORT: "${RELAYER_PORT:-8083}"
+      RELAYER_RPC_URL: "${RELAYER_RPC_URL:-http://anvil:8545}"
+      # Key MUST be set in .env.testnet — must NOT share the deployer key to
+      # avoid nonce collisions during contract re-deployment.
+      RELAYER_PRIVATE_KEY: "${RELAYER_PRIVATE_KEY:?RELAYER_PRIVATE_KEY must be set in .env.testnet}"
+      RELAYER_POLICY_PATH: "/app/config/relayer-policy.example.json"
+      TESTNET_TOKEN_ADDR: "${TESTNET_TOKEN_ADDR:-}"
+      TESTNET_STAKING_ADDR: "${TESTNET_STAKING_ADDR:-}"
+      RUST_LOG: "info"
+    ports:
+      - "8083:8083"
+    depends_on:
+      anvil:
+        condition: service_healthy
+      deploy-contracts:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Enhanced Web Explorer (standalone) ────────────────────────────────────
+  web-explorer:
+    <<: *web-explorer-image
+    container_name: creg-testnet-web-explorer
+    ports:
+      - "3007:80"
+    depends_on:
+      node-1:
+        condition: service_healthy
+      relayer:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Stress Test service ─────────────────────────────────────────────────────
+  stress-test:
+    image: chain-registry-stress-test:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.stress-test
+    container_name: creg-stress-test
+    working_dir: /app
+    volumes:
+      - ./scripts/stress-test.py:/app/stress-test.py:ro
+      - ./.env.testnet:/app/.env.testnet:ro
+    environment:
+      DOCKER_MODE: "true"
+      CREG_IPFS_URL: "http://ipfs:5001"
+    env_file:
+      - .env.testnet
+    command:
+      - --nodes
+      - "1"
+      - --packages
+      - "50"
+      - --concurrency
+      - "5"
+      - --timeout
+      - "120"
+    depends_on:
+      node-1:
+        condition: service_healthy
+      ipfs:
+        condition: service_started
+    profiles:
+      - stress-test
+
+  # ── HashiCorp Vault (Key Management) ────────────────────────────────────────
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: creg-testnet-vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "root"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    restart: unless-stopped
+    command: ["server", "-dev"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Vault Initializer (Testnet only) ────────────────────────────────────────
+  vault-init:
+    image: hashicorp/vault:1.15
+    container_name: creg-testnet-vault-init
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "root"
+    command: >
+      sh -c '
+      vault kv put secret/creg/validator 
+      validator_key="${NODE1_VALIDATOR_KEY}" 
+      bridge_key="${CREG_BRIDGE_KEY}" &&
+      echo "Vault initialized successfully."
+      '
+    profiles:
+      - default
+
+volumes:
+  ipfs-data:
+  anvil-data:
+  postgres-data:
+  node-1-data:
+
+# Docker secrets for validator keys (alternative to .env injection)
+# Usage: docker compose --env-file .env.testnet -f docker-compose.testnet.yml up -d
+# For secrets-based deployment:
+#   1. Create individual key files: echo "KEY_HEX" > validator-keys/node-1.key
+#   2. Use `docker secret create` for Swarm mode, or file-based secrets below
+secrets:
+  node1-validator-key:
+    file: ./validator-keys/validator-1.env

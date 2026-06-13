@@ -1,0 +1,92 @@
+# Public-facing services overlay for the 3-node Sepolia lab.
+#
+# Adds faucet (:8082) and web explorer (default host :3017) on top of docker-compose.3node.yml.
+#
+# Usage:
+#   docker compose -f testnet/docker-compose.3node.yml -f testnet/docker-compose.3node-services.yml \
+#     --env-file testnet/sepolia-3node.env up -d
+#
+# Or: .\testnet\start-3node-public.ps1
+
+services:
+  creg-node-1:
+    environment:
+      CREG_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+      CREG_BRIDGE_KEY: ${CREG_BRIDGE_KEY:-}
+      CREG_TESTNET: "true"
+
+  creg-node-2:
+    environment:
+      CREG_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+      CREG_BRIDGE_KEY: ${CREG_BRIDGE_KEY:-}
+
+  creg-node-3:
+    environment:
+      CREG_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+
+  faucet:
+    image: creg-node:local-3node
+    container_name: creg-3node-faucet
+    entrypoint: ["/app/faucet"]
+    environment:
+      CREG_SECRETS_BACKEND: env
+      FAUCET_PORT: "8082"
+      FAUCET_RPC_URL: ${SEPOLIA_RPC_URL:-${CREG_ETH_RPC:-https://ethereum-sepolia-rpc.publicnode.com}}
+      FAUCET_PUBLIC_RPC_URL: ${FAUCET_PUBLIC_RPC_URL:-http://localhost:3017/rpc}
+      FAUCET_PRIVATE_KEY: ${FAUCET_PRIVATE_KEY:-}
+      FAUCET_ADDRESS: ${FAUCET_ADDRESS:-}
+      FAUCET_TOKEN_CONTRACT: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+      FAUCET_CHAIN_ID: "11155111"
+      FAUCET_DRIP_AMOUNT: "1000000000000000000000"
+      FAUCET_COOLDOWN_SECS: "60"
+      FAUCET_POW_DISABLED: "true"
+      FAUCET_EXPLORER_URL: ${CREG_PUBLIC_EXPLORER_URL:-http://localhost:3017}
+      RUST_LOG: info
+    ports:
+      - "${CREG_3NODE_FAUCET_PORT:-8082}:8082"
+    networks:
+      - creg-3node
+    depends_on:
+      creg-node-3:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8082/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web-explorer:
+    image: chain-registry-web-explorer:3node
+    build:
+      context: ../explorer
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ""
+        VITE_NETWORK: testnet
+        VITE_NODE_ROUTE_MODE: auto
+        VITE_SEPOLIA_CREG_TOKEN: ${CREG_TOKEN_ADDR:-0x97c21d46B3eac604e92E907D54aA92eEc0Af550b}
+        VITE_SEPOLIA_STAKING_ADDR: ${CREG_STAKING_ADDR:-0xf28C63C4Aafd27025E535Ab9ab7B4daC18C96Bc2}
+        VITE_SEPOLIA_REGISTRY_ADDR: ${CREG_REGISTRY_ADDR:-0x3aCfF05d00AC199412a94326eD8aA874aaA3596c}
+        VITE_DEFAULT_NETWORK_PROFILE: sepolia
+        VITE_OPERATOR_API_KEY: ${CREG_OPERATOR_API_KEY:-docker-dev-operator-key}
+        VITE_TESTNET_PHASE: coordinated-lab
+        VITE_SINGLE_VALIDATOR: "false"
+        VITE_DEV_SANDBOX_CAVEAT: "true"
+    container_name: creg-3node-explorer
+    ports:
+      - "${CREG_3NODE_EXPLORER_PORT:-3017}:80"
+    volumes:
+      - ./nginx/explorer-3node.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - creg-3node
+    depends_on:
+      creg-node-3:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

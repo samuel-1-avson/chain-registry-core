@@ -1,0 +1,10 @@
+# Minimal rootfs for Ruby/gem ecosystem sandbox validation
+FROM ruby:3-alpine AS base
+RUN apk add --no-cache ca-certificates build-base && \
+    rm -rf /var/cache/apk/* /tmp/* /root/.cache && \
+    adduser -D -u 99999 sandbox
+
+FROM scratch
+COPY --from=base / /
+USER 99999
+WORKDIR /tmp

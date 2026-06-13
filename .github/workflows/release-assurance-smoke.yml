@@ -1,0 +1,44 @@
+name: Release Assurance Smoke
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - ".github/workflows/release-assurance-smoke.yml"
+      - "config/release-assurance/**"
+      - "scripts/ddc-verify.sh"
+      - "scripts/release-assurance.sh"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-assurance-smoke.yml"
+      - "config/release-assurance/**"
+      - "scripts/ddc-verify.sh"
+      - "scripts/release-assurance.sh"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: .
+
+jobs:
+  release-assurance-smoke:
+    name: Validate release assurance surface
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate release assurance inventory
+        run: jq empty config/release-assurance/toolchain-inventory.json
+
+      - name: Validate release assurance scripts
+        run: |
+          bash -n scripts/ddc-verify.sh
+          bash -n scripts/release-assurance.sh
+          ./scripts/ddc-verify.sh --help
+          ./scripts/release-assurance.sh --help

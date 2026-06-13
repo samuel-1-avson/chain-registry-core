@@ -1,0 +1,430 @@
+# docker-compose.local-testnet.yml
+# Canonical local three-validator stack with observer, dedicated indexer,
+# faucet, relayer, and optional observability overlay.
+#
+# Usage:
+#   docker compose --env-file .env.local-testnet -f docker-compose.local-testnet.yml up -d --build
+#   docker compose --env-file .env.local-testnet -f docker-compose.local-testnet.yml \
+#     -f observability/docker-compose.observability.yml up -d --build
+
+name: creg-local
+
+x-app-image: &app-image
+  image: chain-registry-app:latest
+  build:
+    context: .
+    dockerfile: ${CREG_DOCKERFILE:-Dockerfile}
+
+x-web-explorer-image: &web-explorer-image
+  image: chain-registry-web-explorer:latest
+  build:
+    context: ./explorer
+    dockerfile: Dockerfile
+    args:
+      VITE_CREG_TOKEN: ${LOCAL_TESTNET_TOKEN_ADDR:-0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}
+      VITE_STAKING_ADDR: ${LOCAL_TESTNET_STAKING_ADDR:-0x5FC8d32690cc91D4c39d9d3abcBD16989F875707}
+      VITE_SEPOLIA_CREG_TOKEN: ${VITE_SEPOLIA_CREG_TOKEN}
+      VITE_SEPOLIA_STAKING_ADDR: ${VITE_SEPOLIA_STAKING_ADDR}
+      VITE_DEFAULT_NETWORK_PROFILE: ${VITE_DEFAULT_NETWORK_PROFILE:-sepolia}
+      VITE_DEV_MODE: ${VITE_DEV_MODE:-true}
+      VITE_API_BASE: ""
+      VITE_NODE_ROUTE_MODE: ${VITE_NODE_ROUTE_MODE:-legacy}
+
+x-local-validator-set: &local-validator-set >-
+  {"validators":[{"id":"node-1","alias":"validator-1","pubkey":"808704b7245921ce7fa3d923bccd0cc30cea91885bc639e92ba4e4c20fcfe6bd","eth_address":"${LOCAL_GENESIS_VALIDATOR_EVM_ADDRESS:-0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC}","stake":100,"reputation":100,"status":"online"},{"id":"node-2","alias":"validator-2","pubkey":"c01ac0cf441e6fb2532273322d703afd55b2b418319958b1799014a83bff7a40","eth_address":"0x90F79bf6EB2c4f870365E785982E1f101E93b906","stake":100,"reputation":100,"status":"online"},{"id":"node-3","alias":"validator-3","pubkey":"712651f450ba05b63898b99ef5f7ba45632e8e2527f7f715cd671ec4024cc51e","eth_address":"0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65","stake":100,"reputation":100,"status":"online"}]}
+
+x-postgres-url: &postgres-url postgres://${POSTGRES_USER:-creg}:${POSTGRES_PASSWORD:-creg}@postgres:5432/${POSTGRES_DB:-chain_registry}
+
+x-node-base: &node-base
+  <<: *app-image
+  restart: unless-stopped
+  depends_on:
+    ipfs:
+      condition: service_started
+    anvil:
+      condition: service_healthy
+    deploy-contracts:
+      condition: service_completed_successfully
+  volumes:
+    - ./circuits:/app/circuits:ro
+    - ./validators:/app/validators:ro
+    - ./models:/app/models:ro
+    - ./config/sandbox:/app/config/sandbox:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+  environment: &node-env
+    CREG_CHAIN_ID: "creg-local-3validator"
+    CREG_TESTNET: "true"
+    CREG_DATA_DIR: "/data"
+    CREG_LISTEN: "0.0.0.0:8080"
+    CREG_P2P_LISTEN: "/ip4/0.0.0.0/tcp/9000"
+    CREG_P2P_SEEDS: "/dns4/node-2/tcp/9000,/dns4/node-3/tcp/9000"
+    CREG_ETH_RPC: "http://anvil:8545"
+    CREG_IPFS_URL: "http://ipfs:5001"
+    CREG_BLOCK_INTERVAL: "${CREG_BLOCK_INTERVAL:-2}"
+    CREG_SINGLE_VALIDATOR_MODE: "false"
+    CREG_DEV_SANDBOX: "${CREG_DEV_SANDBOX:-true}"
+    CREG_PBFT_ALLOW_SMALL_CLUSTER_QUORUM: "${CREG_PBFT_ALLOW_SMALL_CLUSTER_QUORUM:-true}"
+    CREG_ZK_ENABLED: "true"
+    CREG_ZK_CIRCUITS_PATH: "/app/circuits"
+    CREG_ML_ENABLED: "true"
+    CREG_ML_MODEL_PATH: "/app/models"
+    CREG_WASM_ENABLED: "true"
+    CREG_WASM_VALIDATORS_PATH: "/app/validators"
+    CREG_REGISTRY_ADDR: "${LOCAL_TESTNET_REGISTRY_ADDR:-0x8A791620dd6260079BF849Dc5567aDC3F2FdC318}"
+    CREG_GOVERNANCE_ADDR: "${LOCAL_TESTNET_GOVERNANCE_ADDR:-0x5FbDB2315678afecb367f032d93F642f64180aa3}"
+    CREG_TOKEN_ADDR: "${LOCAL_TESTNET_TOKEN_ADDR:-0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}"
+    CREG_STAKING_ADDR: "${LOCAL_TESTNET_STAKING_ADDR:-0x5FC8d32690cc91D4c39d9d3abcBD16989F875707}"
+    CREG_REPUTATION_ADDR: "${LOCAL_TESTNET_REPUTATION_ADDR:-0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512}"
+    CREG_VRF_ADDR: "${LOCAL_TESTNET_VRF_ADDR:-0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0}"
+    CREG_VALIDATOR_SET: *local-validator-set
+    RUST_LOG: "${RUST_LOG:-info,chain_registry_node=debug,consensus=debug}"
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+services:
+
+  app-image:
+    <<: *app-image
+    command: ["true"]
+    profiles:
+      - build
+
+  web-explorer-image:
+    <<: *web-explorer-image
+    command: ["true"]
+    profiles:
+      - build
+
+  ipfs:
+    image: ipfs/kubo:v0.27.0
+    container_name: creg-local-ipfs
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8081:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+      - ./scripts/ipfs-cors-container.sh:/container-init.d/ipfs-cors.sh:ro
+    command: ["daemon", "--init", "--init-profile=server", "--routing=dhtclient"]
+    environment:
+      - IPFS_PROFILE=server
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ipfs", "id"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:v0.3.0
+    container_name: creg-local-anvil
+    entrypoint: ["anvil", "--host", "0.0.0.0", "--chain-id", "31337", "--block-time", "1", "--accounts", "10"]
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./contracts:/contracts
+      - anvil-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  deploy-contracts:
+    image: ghcr.io/foundry-rs/foundry:v0.3.0
+    container_name: creg-local-deploy
+    depends_on:
+      anvil:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-lc"]
+    volumes:
+      - ./:/workspace
+    working_dir: /workspace
+    command:
+      - |
+        set -e
+        echo 'Waiting for Anvil...'
+        sleep 3
+        mkdir -p contracts/deployments testnet/artifacts
+        GOVERNANCE_CODE=$$(cast code 0x5FbDB2315678afecb367f032d93F642f64180aa3 --rpc-url http://anvil:8545 2>/dev/null || true)
+        if echo "$$GOVERNANCE_CODE" | grep -qE '^0x.{4,}'; then
+          echo 'Contracts already deployed at expected addresses — skipping forge script.'
+          exit 0
+        fi
+        forge build
+        echo 'Deploying contracts...'
+        exec forge script contracts/script/Deploy.s.sol:DeployChainRegistry \
+          --rpc-url http://anvil:8545 \
+          --broadcast \
+          -vvvv
+    environment:
+      DEPLOYER_KEY: "${DEPLOYER_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"
+      CREG_BRIDGE_KEY: "${CREG_BRIDGE_KEY:-0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a}"
+      FAUCET_ADDRESS: "${FAUCET_ADDRESS:-0x70997970C51812dc3A010C7d01b50e0d17dc79C8}"
+      TESTNET_MODE: "true"
+      DEPLOYMENT_MANIFEST_PATH: "contracts/deployments/latest.json"
+      FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+      ETHERSCAN_API_KEY: "dummy"
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: creg-local-postgres
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-creg}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-creg}"
+      POSTGRES_DB: "${POSTGRES_DB:-chain_registry}"
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./testnet/init-testnet-db.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-creg} -d ${POSTGRES_DB:-chain_registry}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  node-1:
+    <<: *node-base
+    container_name: creg-local-node-1
+    ports:
+      - "8080:8080"
+      - "30157:50051"
+      - "9007:9000"
+    volumes:
+      - node-1-data:/data
+      - ./rules:/app/rules:ro
+      - ./circuits:/app/circuits:ro
+      - ./validators:/app/validators:ro
+      - ./models:/app/models:ro
+      - ./config/sandbox:/app/config/sandbox:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      <<: *node-env
+      CREG_NODE_ID: "node-1"
+      CREG_IS_VALIDATOR: "true"
+      CREG_VALIDATOR_KEY: "${NODE1_VALIDATOR_KEY:-848019e3bdb66143723dd68e60e62c03b8d42e010d70638691eb2631b3637691}"
+      CREG_PEERS: "http://node-2:8080,http://node-3:8080,http://observer:8080"
+
+  node-2:
+    <<: *node-base
+    container_name: creg-local-node-2
+    ports:
+      - "8085:8080"
+      - "30158:50051"
+      - "9008:9000"
+    volumes:
+      - node-2-data:/data
+      - ./rules:/app/rules:ro
+      - ./circuits:/app/circuits:ro
+      - ./validators:/app/validators:ro
+      - ./models:/app/models:ro
+      - ./config/sandbox:/app/config/sandbox:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      <<: *node-env
+      CREG_NODE_ID: "node-2"
+      CREG_IS_VALIDATOR: "true"
+      CREG_VALIDATOR_KEY: "${NODE2_VALIDATOR_KEY:-5e6f4d3c2b1a09876543210fedcba9876543210fedcba9876543210fedcba987}"
+      CREG_P2P_SEEDS: "/dns4/node-1/tcp/9000"
+      CREG_PEERS: "http://node-1:8080,http://node-3:8080,http://observer:8080"
+
+  node-3:
+    <<: *node-base
+    container_name: creg-local-node-3
+    ports:
+      - "8086:8080"
+      - "30159:50051"
+      - "9009:9000"
+    volumes:
+      - node-3-data:/data
+      - ./rules:/app/rules:ro
+      - ./circuits:/app/circuits:ro
+      - ./validators:/app/validators:ro
+      - ./models:/app/models:ro
+      - ./config/sandbox:/app/config/sandbox:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      <<: *node-env
+      CREG_NODE_ID: "node-3"
+      CREG_IS_VALIDATOR: "true"
+      CREG_VALIDATOR_KEY: "${NODE3_VALIDATOR_KEY:-1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100}"
+      CREG_P2P_SEEDS: "/dns4/node-1/tcp/9000"
+      CREG_PEERS: "http://node-1:8080,http://node-2:8080,http://observer:8080"
+
+  observer:
+    <<: *node-base
+    container_name: creg-local-observer
+    networks:
+      default:
+        aliases:
+          - node
+    ports:
+      - "8087:8080"
+      - "30160:50051"
+      - "9010:9000"
+    volumes:
+      - observer-data:/data
+      - ./rules:/app/rules:ro
+      - ./circuits:/app/circuits:ro
+      - ./validators:/app/validators:ro
+      - ./models:/app/models:ro
+      - ./config/sandbox:/app/config/sandbox:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      <<: *node-env
+      CREG_NODE_ID: "observer-1"
+      CREG_IS_VALIDATOR: "false"
+      CREG_P2P_SEEDS: "/dns4/node-1/tcp/9000"
+      CREG_PEERS: "http://node-1:8080,http://node-2:8080,http://node-3:8080"
+      RUST_LOG: "${OBSERVER_RUST_LOG:-info,chain_registry_node=debug}"
+
+  indexer:
+    <<: *app-image
+    container_name: creg-local-indexer
+    entrypoint: ["/app/creg-indexer"]
+    environment:
+      CREG_PG_URL: *postgres-url
+      CREG_INDEXER_DATA_DIR: "/chain-data"
+      CREG_INDEXER_LISTEN: "0.0.0.0:8084"
+      CREG_INDEXER_POLL_INTERVAL_SECS: "${CREG_INDEXER_POLL_INTERVAL_SECS:-1}"
+      RUST_LOG: "${INDEXER_RUST_LOG:-info,db_sync=debug}"
+    ports:
+      - "8084:8084"
+    volumes:
+      - observer-data:/chain-data:ro
+    depends_on:
+      observer:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cli:
+    <<: *app-image
+    container_name: creg-local-cli
+    entrypoint: ["/app/creg"]
+    command: ["--help"]
+    environment:
+      CREG_NODE_URL: "http://observer:8080"
+      CREG_ETH_RPC: "http://anvil:8545"
+    depends_on:
+      observer:
+        condition: service_healthy
+    profiles:
+      - cli
+
+  tui-explorer:
+    <<: *app-image
+    container_name: creg-local-tui-explorer
+    entrypoint: ["/app/creg"]
+    command: ["explorer"]
+    environment:
+      CREG_NODE_URL: "http://observer:8080"
+    stdin_open: true
+    tty: true
+    depends_on:
+      observer:
+        condition: service_healthy
+    profiles:
+      - tui
+
+  faucet:
+    <<: *app-image
+    container_name: creg-local-faucet
+    entrypoint: ["/app/faucet"]
+    environment:
+      FAUCET_PORT: "${FAUCET_PORT:-8082}"
+      FAUCET_RPC_URL: "${FAUCET_RPC_URL:-http://anvil:8545}"
+      FAUCET_PRIVATE_KEY: "${FAUCET_PRIVATE_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}"
+      FAUCET_ADDRESS: "${FAUCET_ADDRESS:-0x70997970C51812dc3A010C7d01b50e0d17dc79C8}"
+      FAUCET_TOKEN_CONTRACT: "${LOCAL_TESTNET_TOKEN_ADDR:-0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}"
+      FAUCET_DRIP_AMOUNT: "${FAUCET_DRIP_AMOUNT:-1000000000000000000000}"
+      FAUCET_NATIVE_DRIP_AMOUNT: "${FAUCET_NATIVE_DRIP_AMOUNT:-100000000000000000}"
+      FAUCET_COOLDOWN_SECS: "${FAUCET_COOLDOWN_SECS:-60}"
+      FAUCET_IP_COOLDOWN_SECS: "${FAUCET_IP_COOLDOWN_SECS:-60}"
+      FAUCET_MAX_BALANCE: "${FAUCET_MAX_BALANCE:-10000000000000000000000}"
+      FAUCET_NATIVE_MAX_BALANCE: "${FAUCET_NATIVE_MAX_BALANCE:-1000000000000000000}"
+      FAUCET_POW_DISABLED: "${FAUCET_POW_DISABLED:-false}"
+      FAUCET_EXPLORER_URL: "http://localhost:3007"
+      FAUCET_PUBLIC_RPC_URL: "http://localhost:8545"
+      FAUCET_CHAIN_ID: "31337"
+      FAUCET_PG_URL: *postgres-url
+      FAUCET_ADMIN_TOKEN: "${FAUCET_ADMIN_TOKEN:-local-testnet-admin-token}"
+      RUST_LOG: "${FAUCET_RUST_LOG:-info}"
+    ports:
+      - "8082:8082"
+    depends_on:
+      anvil:
+        condition: service_healthy
+      deploy-contracts:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  relayer:
+    <<: *app-image
+    container_name: creg-local-relayer
+    entrypoint: ["/app/creg-relayer"]
+    environment:
+      RELAYER_PORT: "${RELAYER_PORT:-8083}"
+      RELAYER_RPC_URL: "${RELAYER_RPC_URL:-http://anvil:8545}"
+      RELAYER_PRIVATE_KEY: "${RELAYER_PRIVATE_KEY:-0x2a871d0798f97d79848a013d4936a73bf4cc922c325d5dc0003f279c7aa26f8f}"
+      RELAYER_POLICY_PATH: "/app/config/relayer-policy.example.json"
+      TESTNET_TOKEN_ADDR: "${LOCAL_TESTNET_TOKEN_ADDR:-0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}"
+      TESTNET_STAKING_ADDR: "${LOCAL_TESTNET_STAKING_ADDR:-0x5FC8d32690cc91D4c39d9d3abcBD16989F875707}"
+      RUST_LOG: "${RELAYER_RUST_LOG:-info}"
+    ports:
+      - "8083:8083"
+    depends_on:
+      anvil:
+        condition: service_healthy
+      deploy-contracts:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web-explorer:
+    <<: *web-explorer-image
+    container_name: creg-local-web-explorer
+    ports:
+      - "3007:80"
+    environment:
+      VITE_RELAYER_URL: "/v1/relayer"
+    depends_on:
+      observer:
+        condition: service_healthy
+      relayer:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ipfs-data:
+  anvil-data:
+  postgres-data:
+  node-1-data:
+  node-2-data:
+  node-3-data:
+  observer-data:

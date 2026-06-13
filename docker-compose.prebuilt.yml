@@ -1,0 +1,100 @@
+# Pre-built Docker Images - Quick Start
+# Use this file to run Chain Registry with pre-built images (no building required)
+#
+# Usage:
+#   docker-compose -f docker-compose.prebuilt.yml up -d
+#
+# Images are automatically built and published to GitHub Container Registry
+# by the CI/CD pipeline on every push to main branch.
+
+version: "3.9"
+
+services:
+  # ── IPFS ────────────────────────────────────────────────────────────────────
+  ipfs:
+    image: ipfs/kubo:v0.27.0
+    container_name: creg-ipfs
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8081:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+    command: ["daemon", "--init", "--init-profile=server"]
+    sysctls:
+      - net.core.rmem_max=2500000
+      - net.core.wmem_max=2500000
+    restart: unless-stopped
+
+  # ── Anvil (local Ethereum) ──────────────────────────────────────────────────
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: creg-anvil
+    entrypoint: ["anvil", "--host", "0.0.0.0", "--chain-id", "31337", "--block-time", "1"]
+    ports:
+      - "8545:8545"
+    volumes:
+      - anvil-data:/data
+    restart: unless-stopped
+
+  # ── Chain Registry Node (PRE-BUILT) ────────────────────────────────────────
+  # Using pre-built image from GitHub Container Registry
+  # No compilation needed!
+  node:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-chain-registry}/chain-registry:latest
+    container_name: creg-node
+    pull_policy: always  # Always pull latest image
+    environment:
+      CREG_NODE_ID: "node-1"
+      CREG_IS_VALIDATOR: "true"
+      CREG_VALIDATOR_KEY: "${NODE1_VALIDATOR_KEY}"
+      CREG_LISTEN: "0.0.0.0:8080"
+      CREG_DATA_DIR: "/data"
+      CREG_ETH_RPC: "http://anvil:8545"
+      CREG_SINGLE_VALIDATOR_MODE: "true"
+      CREG_DEV_SANDBOX: "true"
+      CREG_IPFS_URL: "http://ipfs:5001"
+      RUST_LOG: "info"
+    ports:
+      - "8080:8080"
+    volumes:
+      - node-data:/data
+    depends_on:
+      - ipfs
+      - anvil
+    restart: unless-stopped
+
+  # ── CLI (PRE-BUILT) ────────────────────────────────────────────────────────
+  cli:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-chain-registry}/chain-registry:latest
+    container_name: creg-cli
+    entrypoint: ["/app/creg"]
+    environment:
+      CREG_NODE_URL: "http://node:8080"
+    profiles:
+      - cli
+
+  # ── Faucet (PRE-BUILT) ─────────────────────────────────────────────────────
+  faucet:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-chain-registry}/chain-registry:latest
+    container_name: creg-faucet
+    entrypoint: ["/app/faucet"]
+    environment:
+      FAUCET_PORT: "8081"
+      FAUCET_RPC_URL: "http://anvil:8545"
+      FAUCET_PRIVATE_KEY: "${FAUCET_PRIVATE_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}"
+      FAUCET_TOKEN_CONTRACT: "${TESTNET_TOKEN_ADDR}"
+      FAUCET_DRIP_AMOUNT: "1000000000000000000000"
+      RUST_LOG: "info"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - anvil
+    profiles:
+      - faucet
+      - testnet
+
+volumes:
+  ipfs-data:
+  anvil-data:
+  node-data:

@@ -1,0 +1,86 @@
+[package]
+name    = "chain-registry-node"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "node"
+path = "src/lib.rs"
+
+[[bin]]
+name = "creg-node"
+path = "src/main.rs"
+
+[[bin]]
+name = "dump-openapi"
+path = "src/bin/dump_openapi.rs"
+
+[[bin]]
+name = "creg-indexer"
+path = "src/bin/creg_indexer.rs"
+
+[dependencies]
+common    = { path = "../common" }
+chain-registry-secrets = { path = "../secrets" }
+validator = { path = "../validator" }
+ml-validator = { path = "../ml-validator" }
+consensus = { path = "../consensus" }
+resolver  = { path = "../resolver" }
+zk-validator = { path = "../zk-validator" }
+db-sync   = { path = "../db-sync" }
+threshold-encryption = { path = "../threshold-encryption" }
+
+tokio        = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+anyhow       = { workspace = true }
+tracing      = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono       = { workspace = true }
+uuid         = { workspace = true }
+sha2         = { workspace = true }
+hex          = { workspace = true }
+reqwest      = { workspace = true }
+sled         = { workspace = true }
+rocksdb      = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand         = { workspace = true }
+
+axum         = { version = "0.7", features = ["json", "ws"] }
+axum-server  = { version = "0.7", features = ["tls-rustls"], optional = true }
+tower        = { version = "0.4" }
+tower-http   = { version = "0.5", features = ["cors", "trace", "limit"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+flate2       = "1"
+tar          = "0.4"
+libc         = "0.2"
+urlencoding  = { workspace = true }
+thiserror    = { workspace = true }
+futures      = { workspace = true }
+aes-gcm      = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+libp2p       = { version = "0.53", features = ["tcp", "dns", "websocket", "noise", "yamux", "kad", "gossipsub", "identify", "macros", "tokio"] }
+alloy        = { workspace = true }
+k256        = { version = "0.13", features = ["ecdsa"] }
+tonic        = { workspace = true, features = ["transport"] }
+prost        = { workspace = true }
+rust-embed   = { version = "8.0", optional = true }
+mime_guess   = { version = "2.0", optional = true }
+semver       = "1"
+
+# OpenAPI schema + Swagger UI.
+# utoipa 4 is compatible with axum 0.7; utoipa-swagger-ui 7 exposes the
+# `axum` feature that lets us mount Swagger directly onto our Router.
+utoipa             = { version = "4", features = ["axum_extras", "chrono"] }
+utoipa-swagger-ui  = { version = "7", features = ["axum"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = []
+embedded-explorer = ["dep:rust-embed", "dep:mime_guess"]
+tls = ["axum-server"]
+
+[lints]
+workspace = true

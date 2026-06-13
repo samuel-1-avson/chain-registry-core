@@ -1,0 +1,23 @@
+# Standalone Kubo (IPFS) for Sepolia publish smoke / E2E-301.
+# Usage: docker compose -f testnet/docker-compose.ipfs.yml up -d
+
+services:
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: creg-ipfs-local
+    ports:
+      - "127.0.0.1:5001:5001"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+    command: daemon --migrate=true --enable-gc
+    healthcheck:
+      test: ["CMD-SHELL", "ipfs id || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  ipfs-data:

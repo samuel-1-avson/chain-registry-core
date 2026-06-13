@@ -1,0 +1,63 @@
+[package]
+name = "ml-validator"
+version = "0.1.0"
+edition = "2021"
+authors = ["Chain Registry Team"]
+description = "Machine learning-based threat detection for package validation"
+
+[dependencies]
+
+# Feature extraction
+tree-sitter = "0.20"
+tree-sitter-javascript = "0.20"
+tree-sitter-python = "0.20"
+tree-sitter-rust = "0.20"
+
+# Cryptographic hash for feature hashing
+sha2 = "0.10"
+hex = "0.4"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+# Statistics
+statrs = "0.16"
+regex = "1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async
+tokio = { workspace = true }
+futures = "0.3"
+
+# Archive extraction for tarball scanning
+flate2 = "1"
+tar = "0.4"
+
+# YARA-X for pattern-based malware detection (replaces custom ONNX training)
+yara-x = "1.14"
+
+# HTTP client for OSV vulnerability database lookups
+reqwest = { workspace = true, features = ["blocking", "json"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# LRU cache for OSV query results
+lru = "0.12"
+
+# Parallel processing
+rayon = "1.7"
+
+# Common crate
+common = { path = "../common" }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

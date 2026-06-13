@@ -1,0 +1,87 @@
+name: Rust CI
+
+# The Cargo workspace lives in the `chain-registry/` subdirectory, so every
+# `run` step uses `working-directory: .` (same pattern as
+# consensus-evidence.yml). GitHub Actions only executes workflows under the
+# repository-root `.github/workflows/`, which is why this lives here and not in
+# the (dormant) chain-registry/.github/workflows/ci.yml.
+#
+# The toolchain is PINNED so the fmt/clippy gates are deterministic: rustfmt and
+# clippy lint sets change between stable releases, and `-D warnings` would
+# otherwise flip red whenever the runner's stable bumps. Bump this version
+# deliberately (and re-run `cargo fmt`/`clippy` locally on the same version).
+#
+# NOTE: a Foundry (forge build/test) gate is intentionally NOT included yet —
+# the contract deps (forge-std, openzeppelin) are neither committed nor declared
+# as submodules/soldeer deps, so they can't be fetched in a fresh checkout.
+# Activating contract CI requires declaring those deps first (tracked follow-up).
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - ".github/workflows/rust-ci.yml"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/rust-ci.yml"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+defaults:
+  run:
+    working-directory: .
+
+jobs:
+  rust:
+    name: Rust (fmt, clippy, test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (pinned)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.93.0"
+          components: clippy, rustfmt
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libssl-dev build-essential clang llvm libclang-dev \
+            cmake libopenblas-dev protobuf-compiler libprotobuf-dev
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-1.93.0-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-1.93.0-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace --locked
+        env:
+          # Unreachable on purpose -> tests use their offline fallback path.
+          CREG_NODE_URL: "http://127.0.0.1:19999"

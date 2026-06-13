@@ -1,0 +1,10 @@
+# Minimal rootfs for Maven/Java ecosystem sandbox validation
+FROM maven:3-eclipse-temurin-21-alpine AS base
+RUN apk add --no-cache ca-certificates && \
+    rm -rf /var/cache/apk/* /tmp/* /root/.cache && \
+    adduser -D -u 99999 sandbox
+
+FROM scratch
+COPY --from=base / /
+USER 99999
+WORKDIR /tmp

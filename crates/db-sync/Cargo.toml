@@ -1,0 +1,24 @@
+[package]
+name    = "db-sync"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common     = { path = "../common" }
+tokio      = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+anyhow     = { workspace = true }
+thiserror  = { workspace = true }
+tracing    = { workspace = true }
+chrono     = { workspace = true }
+sled       = { workspace = true }
+
+# PostgreSQL async client
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "chrono", "json", "uuid"] }
+
+# Scheduling
+tokio-cron-scheduler = "0.9"
+
+[lints]
+workspace = true

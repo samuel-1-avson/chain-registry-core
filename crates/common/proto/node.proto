@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package node.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ── Registry Service ────────────────────────────────────────────────────────
+// High-performance binary operations for publication and verification.
+service RegistryService {
+    // Fast lookup of the latest verified version of a package.
+    rpc GetLatestVersion(GetVersionRequest) returns (GetVersionResponse);
+    
+    // Submit a signed package for pending validation.
+    // The attestation fields below are publisher claims checked for consistency
+    // during admission; they do not replace validator-side analysis.
+    rpc SubmitPackage(SubmitRequest) returns (SubmitResponse);
+}
+
+// ── Watch Service ──────────────────────────────────────────────────────────
+// Real-time bidirectional event streaming.
+service WatchService {
+    // Subscribe to blockchain events (Blocks, Votes, Packages).
+    rpc StreamEvents(WatchRequest) returns (stream RegistryEvent);
+}
+
+// ── Explorer Service ────────────────────────────────────────────────────────
+// High-throughput querying of chain history.
+service ExplorerService {
+    rpc GetChainStats(Empty) returns (ChainStats);
+    rpc GetBlockByHeight(BlockRequest) returns (BlockResponse);
+}
+
+// ── Data Types ──────────────────────────────────────────────────────────────
+
+message GetVersionRequest {
+    string ecosystem = 1;
+    string name = 2;
+}
+
+message GetVersionResponse {
+    bool found = 1;
+    string version = 2;
+    string content_hash = 3;
+    string status = 4;
+}
+
+message SubmitRequest {
+    string ecosystem = 1;
+    string name = 2;
+    string version = 3;
+    string content_hash = 4;
+    string ipfs_cid = 5;
+    string publisher_address = 16;
+    string publisher_pubkey = 6;
+    string signature = 7;
+    // Publisher-generated admission attestation fields.
+    // These bind the claimed content/manifest hashes and claimed analysis
+    // values. Validator nodes still run the authoritative safety pipeline.
+    bytes publisher_attestation_proof = 8;
+    uint32 claimed_static_analysis_score = 9;
+    bool claimed_sandbox_safe = 10;
+    repeated string publisher_pubkeys = 11;
+    repeated string signatures = 12;
+    uint32 threshold = 13;
+    string manifest_json = 14;
+    string manifest_hash = 15;
+}
+
+message SubmitResponse {
+    bool accepted = 1;
+    string message = 2;
+}
+
+message WatchRequest {
+    string filter = 1; // "all", "blocks", "packages"
+}
+
+message RegistryEvent {
+    string kind = 1;
+    string payload_json = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message BlockRequest {
+    uint64 height = 1;
+}
+
+message BlockResponse {
+    uint64 height = 1;
+    string hash = 2;
+    string prev_hash = 3;
+    string merkle_root = 4;
+}
+
+message ChainStats {
+    uint64 tip_height = 1;
+    string tip_hash = 2;
+    uint32 package_count = 3;
+    uint32 block_count = 4;
+}
+
+message Empty {}

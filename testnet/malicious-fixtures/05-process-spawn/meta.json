@@ -1,0 +1,6 @@
+{
+  "id": "05-process-spawn",
+  "category": "process_spawn",
+  "description": "Undeclared execSync shell invocation",
+  "expected_findings": ["SA003"]
+}

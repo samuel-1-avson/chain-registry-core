@@ -1,0 +1,10 @@
+# Minimal rootfs for Rust/cargo ecosystem sandbox validation
+FROM rust:1-alpine AS base
+RUN apk add --no-cache ca-certificates musl-dev gcc && \
+    rm -rf /var/cache/apk/* /tmp/* /root/.cache && \
+    adduser -D -u 99999 sandbox
+
+FROM scratch
+COPY --from=base / /
+USER 99999
+WORKDIR /tmp

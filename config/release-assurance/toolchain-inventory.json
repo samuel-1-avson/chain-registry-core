@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "source": "chain-registry/DELIVERABLES_INDEX.md",
+  "policy": {
+    "direct_ddc_scope": "Only compilers, compiler-like generators, and owned codegen wrappers are direct DDC targets.",
+    "default_release_gate": "Reproducible rebuild plus evidence bundle is required for release binaries.",
+    "fail_closed": true
+  },
+  "components": [
+    {
+      "id": "rust-release-binaries",
+      "kind": "runtime",
+      "direct_ddc_target": false,
+      "artifacts": [
+        "creg-node",
+        "creg"
+      ],
+      "controls": [
+        "Cargo.lock must be honored with cargo --locked",
+        "CARGO_INCREMENTAL=0",
+        "SOURCE_DATE_EPOCH from the release commit",
+        "RUSTFLAGS path remapping for workspace paths",
+        "two independent target directories must produce byte-identical binaries",
+        "sha256 evidence must be archived"
+      ],
+      "release_gate": "scripts/release-assurance.sh"
+    },
+    {
+      "id": "solidity-contracts",
+      "kind": "smart-contracts",
+      "direct_ddc_target": false,
+      "artifacts": [
+        "contracts/out/**"
+      ],
+      "controls": [
+        "exact solc/foundry version pinning",
+        "stable metadata and compiler settings",
+        "bytecode or codehash comparison before deployment"
+      ],
+      "release_gate": "forge build && forge test"
+    },
+    {
+      "id": "owned-codegen-or-compiler-like-tools",
+      "kind": "compiler-adjacent",
+      "direct_ddc_target": true,
+      "artifacts": [],
+      "controls": [
+        "declare parent compiler source",
+        "declare diverse trusted build path",
+        "compare rebuilt compiler or generator to released binary bit-for-bit",
+        "archive diffoscope output on mismatch"
+      ],
+      "release_gate": "scripts/ddc-verify.sh when a target is declared"
+    },
+    {
+      "id": "container-images",
+      "kind": "packaging",
+      "direct_ddc_target": false,
+      "artifacts": [
+        "ghcr.io/*"
+      ],
+      "controls": [
+        "build from verified binaries",
+        "sign and publish by digest",
+        "emit provenance and SBOM where the builder supports it"
+      ],
+      "release_gate": "docker buildx with provenance and SBOM enabled"
+    }
+  ]
+}

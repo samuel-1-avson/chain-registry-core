@@ -1,0 +1,55 @@
+# Caddy TLS for cloud-edge stack (host network — reaches VPC validator fleet or WireGuard peer).
+#
+# CREG_VALIDATOR_FLEET_MODE=true -> Caddyfile.fleet (VPC validator IP)
+# CREG_HYBRID_MODE=true            -> Caddyfile.hybrid (WireGuard peer)
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: creg-cloud-caddy
+    network_mode: host
+    environment:
+      CREG_ACME_EMAIL: ${CREG_ACME_EMAIL:?set CREG_ACME_EMAIL}
+      CREG_PUBLIC_API_HOST: ${CREG_PUBLIC_API_HOST:?set CREG_PUBLIC_API_HOST}
+      CREG_PUBLIC_EXPLORER_HOST: ${CREG_PUBLIC_EXPLORER_HOST:?set CREG_PUBLIC_EXPLORER_HOST}
+      CREG_PUBLIC_SPEC_HOST: ${CREG_PUBLIC_SPEC_HOST:?set CREG_PUBLIC_SPEC_HOST}
+      CREG_PUBLIC_IPFS_HOST: ${CREG_PUBLIC_IPFS_HOST:?set CREG_PUBLIC_IPFS_HOST}
+      CREG_PUBLIC_FAUCET_HOST: ${CREG_PUBLIC_FAUCET_HOST:-}
+      CREG_PUBLIC_WAITLIST_HOST: ${CREG_PUBLIC_WAITLIST_HOST:-}
+      CREG_PUBLIC_JOIN_HOST: ${CREG_PUBLIC_JOIN_HOST:-}
+      CREG_HUB_WEB_PORT: ${CREG_HUB_WEB_PORT:-8094}
+      CREG_HUB_API_PORT: ${CREG_HUB_API_PORT:-8095}
+      CREG_VALIDATOR_VM_INTERNAL_IP: ${CREG_VALIDATOR_VM_INTERNAL_IP:-}
+      CREG_OBSERVER_POOL_LB_IP: ${CREG_OBSERVER_POOL_LB_IP:-}
+      CREG_OBSERVER_API_UPSTREAM: ${CREG_OBSERVER_API_UPSTREAM:-}
+      CREG_HUB_API_CLOUD_RUN_URL: ${CREG_HUB_API_CLOUD_RUN_URL:-}
+      CREG_WG_LOCAL_PEER: ${CREG_WG_LOCAL_PEER:-10.200.0.2}
+      CREG_LOCAL_NODE3_API_PORT: ${CREG_3NODE_NODE3_API_PORT:-28182}
+      CREG_3NODE_NODE3_API_PORT: ${CREG_3NODE_NODE3_API_PORT:-28182}
+      CREG_3NODE_EXPLORER_PORT: ${CREG_3NODE_EXPLORER_PORT:-3017}
+      CREG_3NODE_FAUCET_PORT: ${CREG_3NODE_FAUCET_PORT:-8082}
+      CREG_3NODE_SPEC_HOST_PORT: ${CREG_3NODE_SPEC_HOST_PORT:-18888}
+      CREG_3NODE_IPFS_HOST_PORT: ${CREG_3NODE_IPFS_HOST_PORT:-15001}
+      CREG_WAITLIST_HOST_PORT: ${CREG_WAITLIST_HOST_PORT:-8088}
+      CREG_SEPOLIA_PUBLIC_RPC_UPSTREAM: ${CREG_SEPOLIA_PUBLIC_RPC_UPSTREAM:-https://ethereum-sepolia-rpc.publicnode.com}
+      CREG_SEPOLIA_PUBLIC_RPC_UPSTREAM_HOST: ${CREG_SEPOLIA_PUBLIC_RPC_UPSTREAM_HOST:-ethereum-sepolia-rpc.publicnode.com}
+    volumes:
+      - ${CREG_CLOUD_CADDYFILE:-./caddy/Caddyfile.hybrid}:/etc/caddy/Caddyfile:ro
+      - ./caddy/waitlist.caddy:/etc/caddy/waitlist.caddy:ro
+      - ./caddy/faucet-edge.caddy:/etc/caddy/faucet-edge.caddy:ro
+      - ./caddy/sepolia-public-rpc.caddy:/etc/caddy/sepolia-public-rpc.caddy:ro
+      - ./caddy/hub.caddy:/etc/caddy/hub.caddy:ro
+      - cloud-caddy-data:/data
+      - cloud-caddy-config:/config
+    depends_on:
+      spec-server:
+        condition: service_healthy
+      web-explorer:
+        condition: service_started
+      faucet:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  cloud-caddy-data:
+  cloud-caddy-config:

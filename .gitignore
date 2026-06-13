@@ -1,0 +1,330 @@
+# =============================================================================
+# Chain Registry Node — Inner Project .gitignore
+# SECURITY: Never commit private keys, seed phrases, or credentials
+# POLICY: Only source code and scripts are tracked.
+#         No docs, models, packages, libraries, or generated artifacts.
+# =============================================================================
+
+# =============================================================================
+# DOCUMENTATION — ignore generated/local notes; track operator-facing docs
+# =============================================================================
+*.md
+!README.md
+!DELIVERABLES_INDEX.md
+!TESTNET_READINESS_REPORT.md
+!DEEP_DIVE_ANALYSIS.md
+!DOCKER.md
+!docs/*.md
+!testnet/README.md
+!testnet/OPERATOR.md
+!testnet/QUICKSTART.md
+!testnet/gcp-public-hosting.md
+!testnet/SOAK_TEST.md
+!testnet/bootstrap/README.md
+!testnet/spec-server/README.md
+!hub/content/**/*.md
+
+# =============================================================================
+# DOCS DIRECTORY — public docs only (chain-registry-core)
+# =============================================================================
+docs/*
+!docs/PUBLIC.md
+!docs/PUBLIC_TESTNET_QUICKSTART.md
+!docs/TESTNET_PHASE_SCOPE.md
+!docs/WALLET_KEY_DERIVATION.md
+!docs/DATABASE_SCHEMA.md
+!docs/CREG_LIMITATIONS_PUBLIC_READINESS_PLAN.md
+!docs/EXTERNAL_COPY_CHECKLIST.md
+!docs/PUBLIC_COPY_REVIEW.md
+!docs/SEC-401-AUDIT-SCOPE.md
+
+# =============================================================================
+# ENVIRONMENT & SECRETS (CRITICAL — NEVER COMMIT)
+# =============================================================================
+.env
+.env.*
+!.env.example
+.env.backup.*
+*.env
+secrets/
+*secret*
+!testnet/gcp/_GcpSecret.ps1
+# SEC-301b: hot-key loader crate (source only — not credential files)
+!crates/secrets/
+!crates/secrets/**
+!.gitignore
+
+# =============================================================================
+# KEYS & CREDENTIALS (CRITICAL)
+# =============================================================================
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.pub
+*.priv
+*password*
+*credential*
+*wallet*
+!explorer/src/pages/WalletPage.jsx
+!hub-web/src/wallet/
+!hub-web/src/wallet/**
+!hub-web/src/components/WalletButton.tsx
+*mnemonic*
+*seed*
+private*
+privkey*
+publisher.key
+*.jks
+*.keystore
+*.asc
+
+# =============================================================================
+# VALIDATOR KEYS (CRITICAL)
+# =============================================================================
+validator-keys/
+validators/
+generated-keys/
+testnet-keys/
+
+# =============================================================================
+# KUBERNETES SECRETS
+# =============================================================================
+k8s/*secret*
+
+# =============================================================================
+# RUST BUILD ARTIFACTS & BINARIES
+# =============================================================================
+/target/
+/target[0-9]*/
+/target-*/
+*.pdb
+*.exe
+creg
+creg-node
+creg-cli
+
+# =============================================================================
+# SMART CONTRACT BUILD / SOLIDITY ARTIFACTS
+# =============================================================================
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/foundry.lock
+contracts/deployments/
+foundry.lock
+remappings.txt
+
+# =============================================================================
+# ZK CIRCUIT BUILD ARTIFACTS & KEYS
+# =============================================================================
+circuits/build/
+circuits/keys/
+circuits/*.bin
+circuits/batch_*.bin
+circuits/proving_key_package*.bin
+circuits/verifying_key_package*.bin
+**/circuits/*.bin
+**/circuits/batch_*.bin
+*.r1cs
+*.zkey
+*.ptau
+*.sym
+!circuits/*.circom
+
+# =============================================================================
+# ML MODELS & TRAINING DATA
+# =============================================================================
+models/
+secret-model/
+*.pkl
+*.onnx
+*.pt
+*.pth
+*.h5
+*.safetensors
+datasets/
+
+# =============================================================================
+# DATA & STORAGE
+# =============================================================================
+/data/
+/node*-data/
+/validator*-data/
+/ipfs-data/
+/postgres-data/
+/dev-data/
+/tmp/
+/temp/
+*.db
+*.sqlite
+*.sqlite3
+*.leveldb
+anvil_state.json
+
+# =============================================================================
+# LOGS
+# =============================================================================
+*.log
+*.log.*
+logs/
+
+# =============================================================================
+# PACKAGE ARTIFACTS & TARBALLS
+# =============================================================================
+*.tgz
+*.tar.gz
+*.zip
+*.tar
+demo-v2/
+malicious-pkg/
+good-pkg-v1/
+good-pkg-v2/
+evil-pkg-v1/
+package/
+packages/
+dist/
+stress-report-out/
+
+# Keep malicious-fixture package inputs: they are committed test inputs for
+# crates/validator/tests/malicious_fixtures.rs, not scratch output. The broad
+# `package/` rule above otherwise excludes them, which breaks the test in a
+# fresh CI checkout ("<id> missing package/ directory").
+!testnet/malicious-fixtures/*/package/
+!testnet/malicious-fixtures/*/package/**
+
+# =============================================================================
+# NODE.JS / NPM (libraries)
+# =============================================================================
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+!hub-web/package-lock.json
+!hub-api/package-lock.json
+yarn.lock
+.npm/
+.yarn/
+
+# =============================================================================
+# PYTHON (libraries)
+# =============================================================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+!hub-web/src/lib/
+!hub-web/src/lib/**
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.mypy_cache/
+.ruff_cache/
+
+# =============================================================================
+# IDE & EDITOR
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.sublime-project
+*.sublime-workspace
+
+# =============================================================================
+# AI TOOL DIRECTORIES
+# =============================================================================
+.blackboxcli/
+.claude/
+.cursor/
+.gemini/
+.ai/
+.playwright-mcp/
+.copilot/
+
+# =============================================================================
+# COVERAGE & TESTING
+# =============================================================================
+coverage/
+**/coverage/
+*.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+lcov.info
+
+# =============================================================================
+# DOCKER
+# =============================================================================
+docker-compose.override.yml
+
+# =============================================================================
+# MISCELLANEOUS
+# =============================================================================
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+*.patch
+*.tmp
+*.swn
+*.pid
+core.*
+
+# =============================================================================
+# TESTNET GENERATED ARTIFACTS
+# =============================================================================
+testnet/sepolia-3node.env
+testnet/gcp/hosting.env
+testnet/monitoring/prometheus-gcp.yml
+testnet/monitoring/alertmanager-gcp.yml
+testnet/gcp/hosting-state.json
+testnet/gcp/sepolia-geth-state.json
+testnet/gcp/validator-fleet-state.json
+testnet/nginx/explorer-fleet.conf
+testnet/docker-compose.validator-fleet.generated.yml
+testnet/soak-3node-logs/
+testnet/*-301-logs/
+testnet/artifacts/
+config/*/deployment.json
+config/local/
+config/production/
+!config/example/
+!config/template/
+scripts/*.key
+scripts/*.json
+!scripts/*.py
+!scripts/*.ps1
+!scripts/*.sh
+
+# =============================================================================
+# PLAYGROUND (demo test payloads)
+# =============================================================================
+playground/
+

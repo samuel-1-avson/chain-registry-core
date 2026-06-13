@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "profile_id": "creg-scanner-profile-2026-05-17",
+  "scanner_version": "creg-detect-v2.0.0",
+  "analysis_bundles": {
+    "policy_bundle_id": "policy-bundle-2026-05-17",
+    "feature_schema_id": "feature-schema-v1",
+    "expert_bundle_id": "expert-rules-2026-05-17",
+    "embedding_model_id": "embedding-disabled-deterministic-v1",
+    "index_epoch": "index-epoch-2026-05-17",
+    "threshold_profile_id": "threshold-profile-v1",
+    "llm_prompt_profile_id": "llm-advisory-disabled-v1",
+    "osv_snapshot_epoch": "osv-off"
+  },
+  "profile_digest": "05426d0e074e05bf20a828d6df580983142dd1d3af01f3f8fcedcb2b4eecf4b0",
+  "signed_by": [
+    {
+      "key_id": "creg-release-key-1",
+      "algorithm": "ed25519",
+      "signature": "fixture-signature"
+    }
+  ]
+}

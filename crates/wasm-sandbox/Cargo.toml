@@ -1,0 +1,45 @@
+[package]
+name = "wasm-sandbox"
+version = "0.1.0"
+edition = "2021"
+authors = ["Chain Registry Team"]
+description = "WASM-based sandboxing for cross-platform package validation"
+
+[dependencies]
+# WASM Runtime
+wasmtime = { workspace = true }
+wasmtime-wasi = { workspace = true }
+wasmtime-runtime = "18"
+
+# WASI components
+cap-std = "2"
+cap-rand = "2"
+
+# Async runtime
+tokio = { workspace = true }
+futures = "0.3"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Memory management
+bytes = "1.5"
+
+# Common crate
+common = { path = "../common" }
+
+[dev-dependencies]
+tempfile = "3"
+wasmprinter = "0.201"
+wat = "1.201"
+
+[lints]
+workspace = true

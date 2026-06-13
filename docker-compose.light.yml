@@ -1,0 +1,110 @@
+# docker-compose.light.yml
+# Lightweight Chain Registry node for consumer hardware
+# 
+# Requirements:
+# - CPU: 2+ cores
+# - RAM: 4-8 GB
+# - Storage: 100-200 GB SSD
+# - Network: 10+ Mbps
+#
+# Compared to full mode: 80% less storage, 50% less RAM
+
+version: "3.9"
+
+services:
+  node-light:
+    build:
+      context: .
+      dockerfile: Dockerfile.light
+    container_name: creg-node-light
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "4001:4001"
+    volumes:
+      - light-data:/data
+    environment:
+      # Light mode configuration
+      - CREG_NODE_MODE=light
+      - CREG_DATA_DIR=/data
+      - CREG_LISTEN=0.0.0.0:8080
+      - CREG_P2P_LISTEN=/ip4/0.0.0.0/tcp/4001
+      
+      # Pruning settings (aggressive for low storage)
+      - CREG_PACKAGE_RETENTION_DAYS=14
+      - CREG_KEEP_FULL_BLOCKS=false
+      - CREG_PRUNE_INTERVAL=500
+      - CREG_MAX_DB_SIZE_GB=100
+      
+      # Low bandwidth settings
+      - CREG_MAX_PEERS=10
+      
+      # L2 Configuration (low gas!)
+      - CREG_ETH_RPC=${L2_RPC_URL:-https://arb1.arbitrum.io/rpc}
+      - CREG_REGISTRY_ADDR=${L2_REGISTRY_ADDR}
+      
+      # Validator settings (optional)
+      - CREG_IS_VALIDATOR=${IS_VALIDATOR:-false}
+      - CREG_VALIDATOR_KEY=${VALIDATOR_KEY}
+      
+      # IPFS (use public gateway to save resources)
+      - CREG_IPFS_URL=${IPFS_URL:-https://ipfs.io}
+      
+      # Logging (reduced for less disk usage)
+      - RUST_LOG=warn,chain_registry_node=info
+    
+    # Resource limits for low-end hardware
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 6G
+        reservations:
+          cpus: '1'
+          memory: 4G
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── CLI helper for light mode ─────────────────────────────────────────────
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-light-cli
+    entrypoint: ["/app/creg"]
+    command: ["--help"]
+    environment:
+      CREG_NODE_URL: "http://node-light:8080"
+    depends_on:
+      - node-light
+    profiles:
+      - cli
+
+  # ── TUI Explorer for light mode ───────────────────────────────────────────
+  # Usage: docker compose -f docker-compose.light.yml run --rm tui-explorer
+  tui-explorer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: creg-light-tui-explorer
+    entrypoint: ["/app/creg"]
+    command: ["explorer"]
+    environment:
+      CREG_NODE_URL: "http://node-light:8080"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - node-light
+    profiles:
+      - tui
+
+  # Optional: SQLite instead of PostgreSQL for light mode
+  # Remove this if using external PostgreSQL or SQLite
+  
+volumes:
+  light-data:
+    driver: local

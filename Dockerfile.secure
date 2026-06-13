@@ -1,0 +1,45 @@
+# Dockerfile.secure
+# Adds nsjail to the standard chain-registry node image.
+# Enables CREG_DEV_SANDBOX=false in production deployments.
+#
+# Prerequisite: chain-registry-app:latest (build via Dockerfile or Dockerfile.windows).
+# nsjail is compiled on the same base image so glibc matches the runtime.
+
+FROM chain-registry-app:latest AS nsjail-builder
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    build-essential \
+    bison \
+    flex \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libnl-route-3-dev \
+    git \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build/nsjail
+RUN git clone --depth 1 https://github.com/google/nsjail.git . && \
+    make -j"$(nproc)"
+
+FROM chain-registry-app:latest AS secure-node
+
+USER root
+# Runtime libs for nsjail (Ubuntu 24.04 vs Debian bookworm package names differ).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnl-route-3-200 \
+    && (apt-get install -y --no-install-recommends libprotobuf32t64 \
+        || apt-get install -y --no-install-recommends libprotobuf32) \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=nsjail-builder /build/nsjail/nsjail /usr/bin/nsjail
+
+RUN mkdir -p /app/config/sandbox/rootfs/npm \
+             /app/config/sandbox/rootfs/cargo \
+             /app/config/sandbox/rootfs/python
+
+RUN chown -R creg:creg /app
+
+USER creg
+
+ENTRYPOINT ["/app/creg-node"]

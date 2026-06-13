@@ -1,0 +1,36 @@
+# Lightweight local test image — copies pre-built host binary.
+# Build the binary first on the host:
+#   cargo build --release --package chain-registry-node
+# Then build this image:
+#   docker build -f Dockerfile.local -t creg-node:local .
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    libssl3 \
+    libopenblas0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY target/release/creg-node /app/creg-node
+COPY target/release/creg /app/creg
+COPY config/ /app/config/
+COPY rules/ /app/rules/
+COPY validators/ /app/validators/
+COPY circuits/ /app/circuits/
+COPY models/ /app/models/
+
+RUN useradd -r -s /bin/false creg
+RUN mkdir -p /data && chown creg:creg /data
+USER creg
+
+VOLUME ["/data"]
+EXPOSE 8080 50051
+
+HEALTHCHECK --interval=20s --timeout=10s --retries=3 \
+  CMD curl -f http://localhost:8080/v1/health || exit 1
+
+ENTRYPOINT ["/app/creg-node"]

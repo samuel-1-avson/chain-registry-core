@@ -1,0 +1,24 @@
+  tarball:  F:\project\chain-registry\chain-registry\tmp\ops-201-smoke\pkg.tgz
+  sha256:   c0aaa698e78394d916663cadb0b506870af2c8627e5b1d1249342c105b9d2671
+  IPFS CID: QmSCRGJpwSyH2QnM7csow2kWrZ8iBT7yXVnjPBqmf9PBWw
+  package:  npm:@creg/ops-201-smoke@1.0.20260530-032738
+  Generating publisher admission attestation...
+[2m2026-05-30T03:28:28.777359Z[0m [32m INFO[0m Loading ZK keys from circuits
+[2m2026-05-30T03:28:31.031713Z[0m [32m INFO[0m ZK proof generated successfully
+  Submitting via gRPC to http://127.0.0.1:50051 ...
+[2m2026-05-30T03:28:31.975932Z[0m [33m WARN[0m gRPC submission failed (status: PermissionDenied, message: "Publisher 0xeb039fcd35855fefc65aa80e29703f35c93d6539 has no on-chain stake and cannot publish", details: [], metadata: MetadataMap { headers: {"content-type": "application/grpc", "date": "Sat, 30 May 2026 03:28:31 GMT", "content-length": "0"} }): falling back to REST
+
+Γ£ù Error: Γ£ù Submission failed: Insufficient stake. Run: creg stake --amount 0.01eth
+
+Staking Information:
+  ΓÇó Publisher minimum: 1 CREG
+  ΓÇó Validator minimum: 100 CREG
+
+  1. Stake as publisher:
+     creg stake 1 --key-file /path/to/key
+
+  2. Stake as validator:
+     creg stake 100 --role validator --key-file /path/to/key
+
+  3. Check your balance:
+     cast balance $ADDRESS --rpc-url $RPC

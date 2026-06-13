@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chain-registry.dev/schemas/package-intelligence-report.v1.json",
+  "title": "CREG Package Intelligence Report (Lane C)",
+  "description": "Post-consensus, non-binding deep analysis for explorers and integrators. Lane B (validator Stage 4) may be embedded as consensus_advisory only.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "canonical",
+    "content_hash",
+    "generated_at",
+    "status",
+    "lane",
+    "sections",
+    "agent_trace",
+    "report_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "creg.intelligence.v1"
+    },
+    "canonical": {
+      "type": "string",
+      "description": "Package canonical id, e.g. npm:lodash@4.17.21"
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "ready", "degraded", "failed"]
+    },
+    "lane": {
+      "const": "C"
+    },
+    "consensus_advisory": {
+      "type": "object",
+      "description": "Optional excerpt from Lane B (Stage 4 LLM). Non-binding.",
+      "properties": {
+        "maliciousness_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "risk_tier": { "type": "string" },
+        "package_summary": { "type": "string" },
+        "model_used": { "type": "string" },
+        "degraded": { "type": "boolean" }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "required": [
+        "executive_summary",
+        "what_it_does",
+        "architecture",
+        "supply_chain",
+        "security_assessment"
+      ],
+      "properties": {
+        "executive_summary": { "type": "string" },
+        "what_it_does": { "type": "string" },
+        "architecture": { "type": "string" },
+        "supply_chain": { "type": "string" },
+        "security_assessment": { "type": "string" },
+        "residual_risks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "recommended_actions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "agent_trace": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step", "tool", "summary", "duration_ms"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 1 },
+          "tool": { "type": "string" },
+          "summary": { "type": "string" },
+          "duration_ms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "report_digest": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$"
+    },
+    "error": {
+      "type": "string",
+      "description": "Present when status is failed"
+    }
+  }
+}

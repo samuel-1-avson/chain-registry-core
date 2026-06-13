@@ -1,0 +1,42 @@
+[Unit]
+Description=Chain Registry Bootstrap Node
+Documentation=https://github.com/your-org/chain-registry
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=creg
+Group=creg
+WorkingDirectory=/opt/chain-registry/bootstrap
+
+# Load environment
+EnvironmentFile=/opt/chain-registry/bootstrap/bootstrap.env
+
+# Binary path
+ExecStart=/usr/local/bin/creg-node \
+  --listen=${CREG_LISTEN} \
+  --p2p-listen=${CREG_P2P_LISTEN} \
+  --data-dir=${CREG_DATA_DIR} \
+  --chain-spec-url=${CREG_CHAIN_SPEC_URL}
+
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Sandboxing (systemd 235+)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/chain-registry/bootstrap/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

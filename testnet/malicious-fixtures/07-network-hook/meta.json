@@ -1,0 +1,6 @@
+{
+  "id": "07-network-hook",
+  "category": "network_behavior",
+  "description": "Install-time HTTP exfiltration",
+  "expected_findings": ["SA006"]
+}
